@@ -1,0 +1,101 @@
+---
+coding: utf-8
+
+title: Robust File Transfer Protocol
+abbrev: rft
+docname: draft-rft-00
+category: info
+
+stand_alone: yes
+pi: [toc, sortrefs, symrefs, comments]
+
+author:
+  -
+    ins: J. Abel
+    name: Johannes Abel
+    org: Technische Universität München
+  -
+    ins: J. Birkner
+    name: Joseph Birkner
+    org: Technische Universität München
+  -
+    ins: P. Oklemann
+    name: Peter Okelmann
+    org: Technische Universität München
+
+--- abstract
+
+This document specifies version 1 of the Robust File Transfer Protocol (RFT). RFT enables clients to retrieve one or multiple files from a file server that offers files for download. Example use cases for RFT are large software updates, download video files, etc..
+This protocol is based on UDP and enables reliable file transfer from a single server to a single client, supporting flow and congestion control.
+
+
+--- middle
+
+# Requirements
+
+1. Point-to-point operation (one client, one server)
+2. The protocol MUST be UDP-based
+3. The protocol MUST NOT use other protocols on top of UDP
+4. The protocol MUST NOT use another protocol on top of itself
+5. The protocol MUST be able to recover from connection drops (e.g., due to outages)
+6. The file transfer MUST be “reliable”
+7. The protocol MUST support flow control
+8. The protocol MUST realize a minimal congestion control (e.g., AIMD)
+9. The protocol does not need to support authentication, integrity protection, or encryption
+10. The protocol MUST support checksums for the received files
+
+
+# Protocol Layers
+
+This protocol builds the following protocol layers upon UDP.
+
+    Client  <-----------------------> Server (File1,File2,...,FileN)  
+            <---Application Layer--->  
+            <----Transport Layer---->  
+            <----------UDP---------->  
+{: #layers title="Layers"}
+
+
+
+## Transport Layer
+
+In general, the reliable file transport has to ensure that a single (or even multiple files) are transferred as a whole. The transfer of single data segments of a file (or maybe even a whole file) is not delay critical and timely in-order delivery of the data of a file is not required (but may be appreciated for efficiency/scalability reasons). However all data MUST be transferred reliably and the correct order per file must be guaranteed in the end.
+
+As multiple files could be requested and transmitted in parallel, it makes sense to have a shared layer for congestion control and flow control.
+
+Although a globally ordered and timely delivery of all data is not required, we chose an approach where a TCP-like transport layer MUST provide a reliable, timely in-order delivery of data, using a globally ordered sequence number between all files. This has the advantage of pure simplicity. An alternative could be to use this layer for congestion and flow control only and use an upper layer for ordering and reliability.
+
+Each UDP packet contains exactly one Transport Layer frame. Thereby a Transport Layer frame is constrained in size by the UDP packet size. 
+
+It consists of the following fields:
+
+
+
+    +---------+----------+-------+=======================+-------+  
+    | version | ack_flag | seqno | application layer     | crc32 |  
+    +---------+----------+-------+=======================+-------+  
+{: #transportframe title="Transport Layer Frame"}
+
+
+
+When the ack_flag is either set to ACK or NACK, the application layer field MUST have a size of zero.  
+When it is set to either ACK or NACK, the seqno field of the Transport Layer is used for ACK or NACK specific data. In those cases a packet MUST NOT alter congestion windows and packet sequence counts. 
+
+## Application Layer
+
+The Application Layer consists of Request and Response Messages to implement a file transfer protocol.
+
+    +-------+------+===================+
+    | type  | size | payload           |
+    +-------+------+===================+
+{: #applicationframe title="Application Layer Frame"}
+
+An application layer frame may be too long to fit into a single network packet. Therefore an application layer frame may be split into an arbitrary number of parts which are sent using the "application layer" field of multiple Transport Layer frames. The receiver is able to reassemble the application payload through the Transport Layers guarantees regarding order amd completeness of the Session Frames. 
+
+While in the Transport Layer the size of the "application layer" field is implied by the network packet size, this does not apply to the Application Layer frame, as it might be spread over multiple packets. Therefore the size field specifies the size of the payload in bytes.
+
+
+
+# Packet Scaling
+
+Request ideal packet size from OS.
