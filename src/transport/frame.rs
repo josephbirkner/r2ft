@@ -47,7 +47,7 @@ enum TransportTlvTypeCode {
 }
 
 /////////////////////////////////
-// MessageFrame
+// ObjectHeader
 
 pub struct ObjectHeader {
     object_id: u64,
@@ -68,7 +68,7 @@ impl Serializable for ObjectHeader {
         cursor.write_u64::<NetworkEndian>(self.object_id);
         leb128::write::unsigned(cursor, self.n_chunks);
         match self.ack_req {
-            true => cursor.write_u8(0x70),
+            true => cursor.write_u8(0x80),
             false => cursor.write_u8(0x00)
         };
         cursor.write_u8(self.object_type);
@@ -86,7 +86,7 @@ impl Serializable for ObjectHeader {
 }
 
 /////////////////////////////////
-// MessageFrame
+// ObjectField
 
 pub struct ObjectField {
     field_type: u8,
