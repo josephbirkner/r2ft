@@ -68,7 +68,7 @@ impl Serializable for ObjectHeader {
         cursor.write_u64::<NetworkEndian>(self.object_id);
         leb128::write::unsigned(cursor, self.n_chunks);
         match self.ack_req {
-            true => cursor.write_u8(0x80),
+            true => cursor.write_u8(0b1000_0000),
             false => cursor.write_u8(0x00)
         };
         cursor.write_u8(self.object_type);
