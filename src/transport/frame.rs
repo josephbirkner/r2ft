@@ -4,6 +4,7 @@ use byteorder::{NetworkEndian, NativeEndian, WriteBytesExt};
 use std::io::{Write, Seek};
 use leb128;
 use std::io::SeekFrom;
+use crate::common::fnv1a32;
 
 /////////////////////////////////
 // SessionId
@@ -17,13 +18,14 @@ pub struct MessageFrame {
     version: u8,
     sid: SessionId,
     tlvs: Vec<TransportTlv>,
-    checksum: u32,
 }
 
 impl Serializable for MessageFrame {
     fn serialize(&self, cursor: &mut Cursor) {
+        let start = cursor.position();
         cursor.write_u8(self.version);
         cursor.write_u64::<NetworkEndian>(self.sid);
+        cursor.write_u8(self.tlvs.len() as u8);
         for tlv in &self.tlvs {
             match tlv {
                 TransportTlv::ObjectHeader(x) => {
@@ -31,7 +33,9 @@ impl Serializable for MessageFrame {
                 }
             }
         }
-        cursor.write_u32::<NetworkEndian>(self.checksum);
+        let end = cursor.position();
+        let checksum = fnv1a32::Fnv32a::hash(cursor, start, end);
+        cursor.write_u32::<NetworkEndian>(checksum);
     }
 }
 

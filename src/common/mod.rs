@@ -1,6 +1,8 @@
 use std::vec;
 use std::io;
 
+pub mod fnv1a32;
+
 pub type Cursor = io::Cursor<Vec<u8>>;
 
 pub struct Error {
