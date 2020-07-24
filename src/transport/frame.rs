@@ -12,6 +12,8 @@ use crate::common::fnv1a32;
 pub type SessionId = u64;
 pub type ObjectId = u64;
 pub type ChunkId = u64;
+pub type ObjectType = u8;
+pub type ObjectFieldType = u8;
 
 /////////////////////////////////
 // MessageFrame
@@ -59,8 +61,8 @@ pub struct ObjectHeader {
     object_id: ObjectId,
     n_chunks: ChunkId, // LEB128
     ack_req: bool, // Ack required
-    object_type: u8,
-    fields: Vec<ObjectField>
+    object_type: ObjectType,
+    fields: Vec<ObjectFieldDescription>
 }
 
 impl Serializable for ObjectHeader {
@@ -94,16 +96,15 @@ impl Serializable for ObjectHeader {
 /////////////////////////////////
 // ObjectField
 
-/// An ObjectField described by `ObjectField` contains multiple ObjectFieldParts on higher layers
+/// An ObjectField described by `ObjectField` contains multiple ObjectFieldContents on higher layers
+pub type ObjectFieldContent = Vec<u8>;
 
-pub type ObjectFieldPart = Vec<u8>;
-
-pub struct ObjectField {
-    field_type: u8,
+pub struct ObjectFieldDescription {
+    field_type: ObjectFieldType,
     length: ChunkId // in nr. of chunks
 }
 
-impl Serializable for ObjectField {
+impl Serializable for ObjectFieldDescription {
     fn serialize(&self, cursor: &mut Cursor) {
         cursor.write_u8(self.field_type);
         leb128::write::unsigned(cursor, self.length);
@@ -119,5 +120,5 @@ pub struct ObjectChunk {
     last_chunk: bool,
     ack_required: bool,
     size_following_chunk: u16, // 11 bit ???
-    content: Vec<ObjectFieldPart>
+    content: Vec<ObjectFieldContent>
 }
