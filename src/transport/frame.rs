@@ -10,6 +10,8 @@ use crate::common::fnv1a32;
 // SessionId
 
 pub type SessionId = u64;
+pub type ObjectId = u64;
+pub type ChunkId = u64;
 
 /////////////////////////////////
 // MessageFrame
@@ -54,8 +56,8 @@ enum TransportTlvTypeCode {
 // ObjectHeader
 
 pub struct ObjectHeader {
-    object_id: u64,
-    n_chunks: u64, // LEB128
+    object_id: ObjectId,
+    n_chunks: ChunkId, // LEB128
     ack_req: bool, // Ack required
     object_type: u8,
     fields: Vec<ObjectField>
@@ -92,9 +94,13 @@ impl Serializable for ObjectHeader {
 /////////////////////////////////
 // ObjectField
 
+/// An ObjectField described by `ObjectField` contains multiple ObjectFieldParts on higher layers
+
+pub type ObjectFieldPart = Vec<u8>;
+
 pub struct ObjectField {
     field_type: u8,
-    length: u64,
+    length: ChunkId // in nr. of chunks
 }
 
 impl Serializable for ObjectField {
@@ -102,4 +108,16 @@ impl Serializable for ObjectField {
         cursor.write_u8(self.field_type);
         leb128::write::unsigned(cursor, self.length);
     }
+}
+
+/////////////////////////////////
+// ObjectChunk
+
+pub struct ObjectChunk {
+    object_id: ObjectId,
+    chunk_id: ChunkId,
+    last_chunk: bool,
+    ack_required: bool,
+    size_following_chunk: u16, // 11 bit ???
+    content: Vec<ObjectFieldPart>
 }
