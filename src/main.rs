@@ -5,6 +5,7 @@ mod common;
 mod transport;
 mod client;
 mod server;
+mod common;
 
 extern crate num;
 #[macro_use]

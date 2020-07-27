@@ -7,6 +7,7 @@ pub use std::str::FromStr;
 // Use third-party FNV hash
 
 pub mod fnv1a32;
+pub mod udp;
 
 /////////////////////////////////
 // Basic Types
