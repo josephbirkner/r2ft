@@ -1,5 +1,4 @@
-use std::sync::mpsc::channel;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 use std::net::UdpSocket;
 use std::time::Duration;
@@ -12,9 +11,9 @@ impl Socket {
  
     pub fn new_server() -> Socket {
         let addr = "0.0.0.0:12057";
-        let mut socket = UdpSocket::bind(addr).expect("Unable to bind to address"); //TODO make configurable
+        let mut socket: UdpSocket = UdpSocket::bind(addr).expect("Unable to bind to address"); //TODO make configurable
 
-        spawn_rx_thread();
+        spawn_rx_thread(&socket);
 
         let mut buf = [0; 10];
         for i in 1..10 {
@@ -33,7 +32,7 @@ impl Socket {
 }
 
 /// receives on rx (network) and sends to tx (other thread)
-fn rx_thread(mut rx: UdpSocket, tx: Sender<[u8; 10]>) {
+fn rx_thread(mut rx: &UdpSocket, tx: Sender<[u8; 10]>) {
     for i in 1..5 {
         println!("rx thread: recv");
         let mut buf = [0; 10];
@@ -44,9 +43,9 @@ fn rx_thread(mut rx: UdpSocket, tx: Sender<[u8; 10]>) {
 }
 
 
-fn spawn_rx_thread() {
-    let (tx, rx) = channel::<Vec<u8>>();
-    let joinable = thread::spawn(move || rx_thread(rx, tx));
+fn spawn_rx_thread(mut socket: &'static UdpSocket) -> Receiver<[u8; 10]> {
+    let (tx, rx) = channel::<[u8; 10]>();
+    let joinable = thread::spawn(move || rx_thread(socket, tx));
     for i in 1..10 {
         print!("Got: ");
         if let Ok(vec) = rx.try_recv() {
@@ -55,6 +54,7 @@ fn spawn_rx_thread() {
         print!("\n");
         thread::sleep(Duration::from_secs(1));
     }
+    return rx;
 }
 
 
