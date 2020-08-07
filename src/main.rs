@@ -1,5 +1,6 @@
 use clap::{App, AppSettings, Arg, SubCommand};
 
+#[macro_use]
 mod common;
 mod transport;
 mod client;

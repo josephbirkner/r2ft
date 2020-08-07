@@ -1,12 +1,11 @@
-use std::vec;
-use crate::common::*;
-use byteorder::{NetworkEndian, NativeEndian, WriteBytesExt, ReadBytesExt};
-use std::io::{Write, Seek, SeekFrom, Error};
+use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
+use std::io::{Seek, SeekFrom};
 use leb128;
 use crate::common::fnv1a32;
+use crate::common::*;
 
 /////////////////////////////////
-// SessionId
+// Basic Types
 
 pub type SessionId = u64;
 pub type ObjectId = u64;
@@ -45,11 +44,11 @@ impl Serializable for MessageFrame {
         while num_tlvs > 0 {
             let tlv_type = match cursor.read_u8() {
                 Ok(typeCode) => typeCode,
-                Err(e) => return SerializationResult::Ok // Err in this case means eof, that's ok
+                Err(_e) => return SerializationResult::Ok // Err in this case means eof, that's ok
             };
-            let tlv = match tlv_type {
-                tlv_type if tlv_type == (TransportTlvTypeCode::ObjectHeader as u8) => TransportTlv(TransportTlv::ObjectHeader),
-                _ => return SerializationResult::Err(Error("Unknown object type code!"))
+            let mut tlv = match tlv_type {
+                tlv_type if tlv_type == (TransportTlvTypeCode::ObjectHeader as u8) => TransportTlv::ObjectHeader(ObjectHeader::default()),
+                _ => return SerializationResult::Err(SerializationError::new("Unknown object type code!"))
             };
             tlv.deserialize(cursor);
             self.tlvs.push(tlv);
@@ -57,7 +56,7 @@ impl Serializable for MessageFrame {
         }
 
         // FIXME: Compare hash!
-        SerializationResult(Ok)
+        SerializationResult::Ok
     }
 }
 
@@ -87,13 +86,14 @@ impl Serializable for TransportTlv {
                 x.deserialize(cursor);
             }
         }
-        SerializationResult(Ok)
+        SerializationResult::Ok
     }
 }
 
 /////////////////////////////////
 // ObjectHeader
 
+#[derive(Default)]
 pub struct ObjectHeader {
     object_id: ObjectId,
     n_chunks: ChunkId, // LEB128
@@ -131,12 +131,12 @@ impl Serializable for ObjectHeader {
 
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {
         // NOTE: TLV Type is already parsed!
-        let mut length = read_u16!(cursor);
+        let length = read_u16!(cursor) as u64;
         let pos = cursor.position();
 
         // Read object header content
         self.object_id = read_u64!(cursor);
-        self.n_chunks = read_leb128!();
+        self.n_chunks = read_leb128!(cursor);
         self.ack_req = match read_u8!(cursor) {
             0b1000_0000 => true,
             _ => false,
@@ -144,17 +144,18 @@ impl Serializable for ObjectHeader {
         self.object_type = read_u8!(cursor);
         let mut num_fields = read_u8!(cursor);
         while num_fields > 0 {
-            self.fields.push(ObjectFieldDescription());
-            self.fields.last().deserialize(cursor);
+            let mut field_description = ObjectFieldDescription::default();
+            field_description.deserialize(cursor);
+            self.fields.push(field_description);
             num_fields -= 1;
         }
 
         // Determine & write length field
         let final_length = cursor.position() - pos;
         if length != final_length {
-            return SerializationResult::Err(Error("Unknown object type code!"));
+            return SerializationResult::Err(SerializationError::new("Unknown object type code!"));
         }
-        SerializationResult(Ok)
+        SerializationResult::Ok
     }
 }
 
@@ -164,6 +165,7 @@ impl Serializable for ObjectHeader {
 /// An ObjectField described by `ObjectField` contains multiple ObjectFieldContents on higher layers
 pub type ObjectFieldContent = Vec<u8>;
 
+#[derive(Default)]
 pub struct ObjectFieldDescription {
     field_type: ObjectFieldType,
     length: ChunkId // in nr. of chunks
@@ -178,7 +180,7 @@ impl Serializable for ObjectFieldDescription{
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {
         self.field_type = read_u8!(cursor);
         self.length = read_leb128!(cursor) as ChunkId;
-        SerializationResult(Ok)
+        SerializationResult::Ok
     }
 }
 
