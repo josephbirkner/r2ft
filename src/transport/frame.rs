@@ -16,10 +16,12 @@ pub type ObjectFieldType = u8;
 /////////////////////////////////
 // MessageFrame
 
+#[derive(Default)]
+#[derive(Debug)]
 pub struct MessageFrame {
-    version: u8,
-    sid: SessionId,
-    tlvs: Vec<TransportTlv>,
+    pub version: u8,
+    pub sid: SessionId,
+    pub tlvs: Vec<TransportTlv>,
 }
 
 impl Serializable for MessageFrame {
@@ -42,10 +44,8 @@ impl Serializable for MessageFrame {
         self.tlvs = Vec::new();
         let mut num_tlvs = read_u8!(cursor);
         while num_tlvs > 0 {
-            let tlv_type = match cursor.read_u8() {
-                Ok(type_code) => type_code,
-                Err(_e) => return SerializationResult::Ok // Err in this case means eof, that's ok
-            };
+            let tlv_type = read_u8!(cursor);
+            cursor.seek(SeekFrom::Current(-1)); // TLV will read type again.
             let mut tlv = match tlv_type {
                 tlv_type if tlv_type == (TransportTlvTypeCode::ObjectHeader as u8) => TransportTlv::ObjectHeader(ObjectHeader::default()),
                 _ => return SerializationResult::Err(SerializationError::new("Unknown object type code!"))
@@ -63,6 +63,7 @@ impl Serializable for MessageFrame {
 /////////////////////////////////
 // TransportTlv
 
+#[derive(Debug)]
 pub enum TransportTlv {
     ObjectHeader(ObjectHeader)
 }
@@ -94,12 +95,13 @@ impl Serializable for TransportTlv {
 // ObjectHeader
 
 #[derive(Default)]
+#[derive(Debug)]
 pub struct ObjectHeader {
-    object_id: ObjectId,
-    n_chunks: ChunkId, // LEB128
-    ack_req: bool, // Ack required
-    object_type: ObjectType,
-    fields: Vec<ObjectFieldDescription>
+    pub object_id: ObjectId,
+    pub n_chunks: ChunkId, // LEB128
+    pub ack_req: bool, // Ack required
+    pub object_type: ObjectType,
+    pub fields: Vec<ObjectFieldDescription>
 }
 
 impl Serializable for ObjectHeader {
@@ -123,14 +125,14 @@ impl Serializable for ObjectHeader {
         }
 
         // Determine & write length field
-        length -= cursor.position();
+        length = cursor.position() - length;
         cursor.seek(SeekFrom::Current(-(length as i64))).expect("seek failed.");
         write_u16!(cursor, (length - 2) as u16); // -2 bc. of length-field
         cursor.seek(SeekFrom::Current(length as i64)).expect("seek failed.");;
     }
 
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {
-        // NOTE: TLV Type is already parsed!
+        assert_eq!(read_u8!(cursor), TransportTlvTypeCode::ObjectHeader as u8);
         let length = read_u16!(cursor) as u64;
         let pos = cursor.position();
 
@@ -166,9 +168,10 @@ impl Serializable for ObjectHeader {
 pub type ObjectFieldContent = Vec<u8>;
 
 #[derive(Default)]
+#[derive(Debug)]
 pub struct ObjectFieldDescription {
-    field_type: ObjectFieldType,
-    length: ChunkId // in nr. of chunks
+    pub field_type: ObjectFieldType,
+    pub length: ChunkId // in nr. of chunks
 }
 
 impl Serializable for ObjectFieldDescription{
@@ -187,11 +190,13 @@ impl Serializable for ObjectFieldDescription{
 /////////////////////////////////
 // ObjectChunk
 
+#[derive(Default)]
+#[derive(Debug)]
 pub struct ObjectChunk {
-    object_id: ObjectId,
-    chunk_id: ChunkId,
-    last_chunk: bool,
-    ack_required: bool,
-    size_following_chunk: u16, // 11 bit ???
-    content: Vec<ObjectFieldContent>
+    pub object_id: ObjectId,
+    pub chunk_id: ChunkId,
+    pub last_chunk: bool,
+    pub ack_required: bool,
+    pub size_following_chunk: u16, // 11 bit ???
+    pub content: Vec<ObjectFieldContent>
 }
