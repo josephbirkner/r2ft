@@ -25,15 +25,15 @@ pub struct MessageFrame {
 impl Serializable for MessageFrame {
     fn serialize(&self, cursor: &mut Cursor) {
         let start = cursor.position();
-        cursor.write_u8(self.version);
-        cursor.write_u64::<NetworkEndian>(self.sid);
-        cursor.write_u8(self.tlvs.len() as u8);
+        write_u8!(cursor, self.version);
+        write_u64!(cursor, self.sid);
+        write_u8!(cursor, self.tlvs.len() as u8);
         for tlv in &self.tlvs {
             tlv.serialize(cursor);
         }
         let end = cursor.position();
         let checksum = fnv1a32::Fnv32a::hash(cursor, start, end);
-        cursor.write_u32::<NetworkEndian>(checksum);
+        write_u32!(cursor, checksum);
     }
 
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {
@@ -43,7 +43,7 @@ impl Serializable for MessageFrame {
         let mut num_tlvs = read_u8!(cursor);
         while num_tlvs > 0 {
             let tlv_type = match cursor.read_u8() {
-                Ok(typeCode) => typeCode,
+                Ok(type_code) => type_code,
                 Err(_e) => return SerializationResult::Ok // Err in this case means eof, that's ok
             };
             let mut tlv = match tlv_type {
@@ -105,28 +105,28 @@ pub struct ObjectHeader {
 impl Serializable for ObjectHeader {
     fn serialize(&self, cursor: &mut Cursor) {
         // Write TLV stub - reserve 16b for content length
-        cursor.write_u8(TransportTlvTypeCode::ObjectHeader as u8);
+        write_u8!(cursor, TransportTlvTypeCode::ObjectHeader as u8);
         let mut length = cursor.position();
-        cursor.write_u16::<NetworkEndian>(0);
+        write_u16!(cursor, 0);
 
         // Write object header content
-        cursor.write_u64::<NetworkEndian>(self.object_id);
-        leb128::write::unsigned(cursor, self.n_chunks);
+        write_u64!(cursor, self.object_id);
+        write_leb128!(cursor, self.n_chunks);
         match self.ack_req {
-            true => cursor.write_u8(0b1000_0000),
-            false => cursor.write_u8(0x00)
+            true => write_u8!(cursor, 0b1000_0000),
+            false => write_u8!(cursor, 0x00)
         };
-        cursor.write_u8(self.object_type);
-        cursor.write_u8(self.fields.len() as u8);
+        write_u8!(cursor, self.object_type);
+        write_u8!(cursor, self.fields.len() as u8);
         for field in &self.fields {
             field.serialize(cursor);
         }
 
         // Determine & write length field
         length -= cursor.position();
-        cursor.seek(SeekFrom::Current(-(length as i64)));
-        cursor.write_u16::<NetworkEndian>((length - 2) as u16); // -2 bc. of length-field
-        cursor.seek(SeekFrom::Current(length as i64));
+        cursor.seek(SeekFrom::Current(-(length as i64))).expect("seek failed.");
+        write_u16!(cursor, (length - 2) as u16); // -2 bc. of length-field
+        cursor.seek(SeekFrom::Current(length as i64)).expect("seek failed.");;
     }
 
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {
@@ -173,8 +173,8 @@ pub struct ObjectFieldDescription {
 
 impl Serializable for ObjectFieldDescription{
     fn serialize(&self, cursor: &mut Cursor) {
-        cursor.write_u8(self.field_type);
-        leb128::write::unsigned(cursor, self.length);
+        write_u8!(cursor, self.field_type);
+        write_leb128!(cursor, self.length);
     }
 
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {

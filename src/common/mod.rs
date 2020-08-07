@@ -1,5 +1,3 @@
-#![feature(macro_rules)]
-
 use std::error::Error;
 use std::io;
 use std::fmt;
@@ -56,7 +54,6 @@ pub trait Serializable {
 /////////////////////////////////
 // Deserialization macros
 
-#[macro_export]
 macro_rules! read_u8 {
     ($cursor:ident) => {
         match $cursor.read_u8() {
@@ -66,7 +63,6 @@ macro_rules! read_u8 {
     };
 }
 
-#[macro_export]
 macro_rules! read_u16 {
     ($cursor:ident) => {
         match $cursor.read_u16::<NetworkEndian>() {
@@ -76,7 +72,6 @@ macro_rules! read_u16 {
     };
 }
 
-#[macro_export]
 macro_rules! read_u32 {
     ($cursor:ident) => {
         match $cursor.read_u32::<NetworkEndian>() {
@@ -86,7 +81,6 @@ macro_rules! read_u32 {
     };
 }
 
-#[macro_export]
 macro_rules! read_u64 {
     ($cursor:ident) => {
         match $cursor.read_u64::<NetworkEndian>() {
@@ -96,12 +90,41 @@ macro_rules! read_u64 {
     };
 }
 
-#[macro_export]
 macro_rules! read_leb128 {
     ($cursor:ident) => {
         match leb128::read::unsigned($cursor) {
             Ok(x) => x,
             Err(e) => return SerializationResult::Err(SerializationError::new(&e.to_string()))
         };
+    };
+}
+
+macro_rules! write_u8 {
+    ($cursor:ident, $value:expr) => {
+        $cursor.write_u8($value).expect("write_u8: Failed.")
+    };
+}
+
+macro_rules! write_u16 {
+    ($cursor:ident, $value:expr) => {
+        $cursor.write_u16::<NetworkEndian>($value).expect("write_u16: Failed.")
+    };
+}
+
+macro_rules! write_u32 {
+    ($cursor:ident, $value:expr) => {
+        $cursor.write_u32::<NetworkEndian>($value).expect("write_u32: Failed.")
+    };
+}
+
+macro_rules! write_u64 {
+    ($cursor:ident, $value:expr) => {
+        $cursor.write_u64::<NetworkEndian>($value).expect("write_u64: Failed.")
+    };
+}
+
+macro_rules! write_leb128 {
+    ($cursor:ident, $value:expr) => {
+        leb128::write::unsigned($cursor, $value).expect("write_leb128: Failed.")
     };
 }
