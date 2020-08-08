@@ -16,8 +16,7 @@ pub type ObjectFieldType = u8;
 /////////////////////////////////
 // MessageFrame
 
-#[derive(Default)]
-#[derive(Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct MessageFrame {
     pub version: u8,
     pub sid: SessionId,
@@ -39,6 +38,7 @@ impl Serializable for MessageFrame {
     }
 
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {
+        let start = cursor.position();
         self.version = read_u8!(cursor);
         self.sid = read_u64!(cursor);
         self.tlvs = Vec::new();
@@ -48,14 +48,18 @@ impl Serializable for MessageFrame {
             cursor.seek(SeekFrom::Current(-1)); // TLV will read type again.
             let mut tlv = match tlv_type {
                 tlv_type if tlv_type == (TransportTlvTypeCode::ObjectHeader as u8) => TransportTlv::ObjectHeader(ObjectHeader::default()),
-                _ => return SerializationResult::Err(SerializationError::new("Unknown object type code!"))
+                _ => return SerializationResult::Err(SerializationError::new(format!("Unknown object type code {}!", tlv_type).as_str()))
             };
             tlv.deserialize(cursor);
             self.tlvs.push(tlv);
             num_tlvs -= 1;
         }
-
-        // FIXME: Compare hash!
+        let end = cursor.position();
+        let checksum = fnv1a32::Fnv32a::hash(cursor, start, end);
+        let advertised_checksum = read_u32!(cursor);
+        if checksum != advertised_checksum {
+            return SerializationResult::Err(SerializationError::new("Checksum error!"))
+        }
         SerializationResult::Ok
     }
 }
@@ -63,7 +67,7 @@ impl Serializable for MessageFrame {
 /////////////////////////////////
 // TransportTlv
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TransportTlv {
     ObjectHeader(ObjectHeader)
 }
@@ -75,27 +79,21 @@ enum TransportTlvTypeCode {
 impl Serializable for TransportTlv {
     fn serialize(&self, cursor: &mut Cursor) {
         match self {
-            TransportTlv::ObjectHeader(x) => {
-                x.serialize(cursor);
-            }
+            TransportTlv::ObjectHeader(x) => x.serialize(cursor)
         }
     }
 
     fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult {
-        match self {
-            TransportTlv::ObjectHeader(x) => {
-                x.deserialize(cursor);
-            }
-        }
-        SerializationResult::Ok
+        return match self {
+            TransportTlv::ObjectHeader(x) => x.deserialize(cursor)
+        };
     }
 }
 
 /////////////////////////////////
 // ObjectHeader
 
-#[derive(Default)]
-#[derive(Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct ObjectHeader {
     pub object_id: ObjectId,
     pub n_chunks: ChunkId, // LEB128
@@ -127,7 +125,8 @@ impl Serializable for ObjectHeader {
         // Determine & write length field
         length = cursor.position() - length;
         cursor.seek(SeekFrom::Current(-(length as i64))).expect("seek failed.");
-        write_u16!(cursor, (length - 2) as u16); // -2 bc. of length-field
+        length -= 2; // -2 bc. of 2B length-field length
+        write_u16!(cursor, length as u16);
         cursor.seek(SeekFrom::Current(length as i64)).expect("seek failed.");;
     }
 
@@ -155,7 +154,7 @@ impl Serializable for ObjectHeader {
         // Determine & write length field
         let final_length = cursor.position() - pos;
         if length != final_length {
-            return SerializationResult::Err(SerializationError::new("Unknown object type code!"));
+            return SerializationResult::Err(SerializationError::new("Object header length mismatch!"));
         }
         SerializationResult::Ok
     }
@@ -167,8 +166,7 @@ impl Serializable for ObjectHeader {
 /// An ObjectField described by `ObjectField` contains multiple ObjectFieldContents on higher layers
 pub type ObjectFieldContent = Vec<u8>;
 
-#[derive(Default)]
-#[derive(Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct ObjectFieldDescription {
     pub field_type: ObjectFieldType,
     pub length: ChunkId // in nr. of chunks
@@ -190,8 +188,7 @@ impl Serializable for ObjectFieldDescription{
 /////////////////////////////////
 // ObjectChunk
 
-#[derive(Default)]
-#[derive(Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct ObjectChunk {
     pub object_id: ObjectId,
     pub chunk_id: ChunkId,
