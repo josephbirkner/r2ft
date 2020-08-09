@@ -6,6 +6,11 @@ mod transport;
 mod client;
 mod server;
 
+extern crate num;
+#[macro_use]
+extern crate num_derive;
+
+
 fn main() {
     let matches = App::new("rft")
         .version("0.1.0")

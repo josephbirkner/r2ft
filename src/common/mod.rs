@@ -14,41 +14,41 @@ pub mod fnv1a32;
 pub type Cursor = io::Cursor<Vec<u8>>;
 
 /////////////////////////////////
-// SerializationError
+// ReadError
 
 #[derive(Debug)]
-pub struct SerializationError {
+pub struct ReadError {
     what: String
 }
 
-impl SerializationError {
-    pub fn new(msg: &str) -> SerializationError {
-        SerializationError{what: msg.to_string()}
+impl ReadError {
+    pub fn new(msg: &str) -> ReadError {
+        ReadError {what: msg.to_string()}
     }
 }
 
-impl fmt::Display for SerializationError {
+impl fmt::Display for ReadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.what)
     }
 }
 
-impl Error for SerializationError {
+impl Error for ReadError {
     fn description(&self) -> &str {
         &self.what
     }
 }
 
-pub enum SerializationResult {
-    Ok, Err(SerializationError)
+pub enum ReadResult {
+    Ok, Err(ReadError)
 }
 
 /////////////////////////////////
-// Serializable
+// WireFormat trait
 
-pub trait Serializable {
-    fn serialize(&self, cursor: &mut Cursor);
-    fn deserialize(&mut self, cursor: &mut Cursor) -> SerializationResult;
+pub trait WireFormat {
+    fn write(&self, cursor: &mut Cursor);
+    fn read(&mut self, cursor: &mut Cursor) -> ReadResult;
 }
 
 /////////////////////////////////
@@ -58,7 +58,7 @@ macro_rules! read_u8 {
     ($cursor:ident) => {
         match $cursor.read_u8() {
             Ok(x) => x,
-            Err(e) => return SerializationResult::Err(SerializationError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
         };
     };
 }
@@ -67,7 +67,7 @@ macro_rules! read_u16 {
     ($cursor:ident) => {
         match $cursor.read_u16::<NetworkEndian>() {
             Ok(x) => x,
-            Err(e) => return SerializationResult::Err(SerializationError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
         };
     };
 }
@@ -76,7 +76,7 @@ macro_rules! read_u32 {
     ($cursor:ident) => {
         match $cursor.read_u32::<NetworkEndian>() {
             Ok(x) => x,
-            Err(e) => return SerializationResult::Err(SerializationError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
         };
     };
 }
@@ -85,19 +85,45 @@ macro_rules! read_u64 {
     ($cursor:ident) => {
         match $cursor.read_u64::<NetworkEndian>() {
             Ok(x) => x,
-            Err(e) => return SerializationResult::Err(SerializationError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
         };
     };
 }
 
-macro_rules! read_leb128 {
+macro_rules! read_u128 {
     ($cursor:ident) => {
         match leb128::read::unsigned($cursor) {
             Ok(x) => x,
-            Err(e) => return SerializationResult::Err(SerializationError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
         };
     };
 }
+
+macro_rules! read_i128 {
+    ($cursor:ident) => {
+        match leb128::read::signed($cursor) {
+            Ok(x) => x,
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
+        };
+    };
+}
+
+macro_rules! read_tlv {
+    ($cursor:ident, $type_code:expr, $read_block:block) => {
+        assert_eq!(read_u8!($cursor), $type_code as u8);
+        let length = read_u16!($cursor) as u64;
+        let mut final_length = $cursor.position();
+        $read_block
+        // Validate length field
+        final_length = $cursor.position() - final_length;
+        if length != final_length {
+            return ReadResult::Err(ReadError::new("Object header length mismatch!"));
+        }
+    };
+}
+
+/////////////////////////////////
+// Serialization macros
 
 macro_rules! write_u8 {
     ($cursor:ident, $value:expr) => {
@@ -123,8 +149,28 @@ macro_rules! write_u64 {
     };
 }
 
-macro_rules! write_leb128 {
+macro_rules! write_u128 {
     ($cursor:ident, $value:expr) => {
-        leb128::write::unsigned($cursor, $value).expect("write_leb128: Failed.")
+        leb128::write::unsigned($cursor, $value).expect("write_u128: Failed.")
+    };
+}
+
+macro_rules! write_i128 {
+    ($cursor:ident, $value:expr) => {
+        leb128::write::signed($cursor, $value).expect("write_i128: Failed.")
+    };
+}
+
+macro_rules! write_tlv {
+    ($cursor:ident, $type_code:expr, $write_block:block) => {
+        write_u8!($cursor, $type_code as u8);
+        let mut length = $cursor.position();
+        write_u16!($cursor, 0);
+        $write_block
+        length = $cursor.position() - length;
+        $cursor.seek(SeekFrom::Current(-(length as i64))).expect("seek failed.");
+        length -= 2; // -2 bc. of 2B length-field length
+        write_u16!($cursor, length as u16);
+        $cursor.seek(SeekFrom::Current(length as i64)).expect("seek failed.");
     };
 }

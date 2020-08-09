@@ -1,4 +1,4 @@
-use crate::common::{Serializable, Cursor, SerializationResult};
+use crate::common::{WireFormat, Cursor, ReadResult};
 use crate::transport::frame::*;
 use itertools::Itertools;
 use std::fs::File;
@@ -12,9 +12,9 @@ fn test_serialize_message_frame()
         version: 1,
         sid: 123,
         tlvs: vec![
-            TransportTlv::ObjectHeader(ObjectHeader {
+            Tlv::ObjectHeader(ObjectHeader {
                 object_id: 1,
-                n_chunks: 2,
+                num_chunks: 2,
                 ack_req: true,
                 object_type: 42,
                 fields: vec![
@@ -24,9 +24,9 @@ fn test_serialize_message_frame()
                     }
                 ]
             }),
-            TransportTlv::ObjectHeader(ObjectHeader {
+            Tlv::ObjectHeader(ObjectHeader {
                 object_id: 1,
-                n_chunks: 2,
+                num_chunks: 2,
                 ack_req: true,
                 object_type: 42,
                 fields: vec![
@@ -42,14 +42,14 @@ fn test_serialize_message_frame()
     // Serialize it!
     let mut buffer = Vec::new();
     let mut cursor = Cursor::new(buffer);
-    message_frame.serialize(&mut cursor);
+    message_frame.write(&mut cursor);
     println!("Encoded message frame: {:02x}", cursor.get_ref().iter().format(" "));
 
     // Deserialize it!
-    cursor.seek(SeekFrom::Start(0));
+    cursor.seek(SeekFrom::Start(0)).unwrap();
     let mut parsed_message_frame = MessageFrame::default();
-    match parsed_message_frame.deserialize(&mut cursor) {
-        SerializationResult::Err(x) => println!("Error: {}", &x.to_string()),
+    match parsed_message_frame.read(&mut cursor) {
+        ReadResult::Err(x) => println!("Error: {}", &x.to_string()),
         _ => {},
     }
 
@@ -61,9 +61,9 @@ fn test_serialize_message_frame()
         let ltlv = &message_frame.tlvs[tlv_id];
         let rtlv = &parsed_message_frame.tlvs[tlv_id];
         match (ltlv, rtlv) {
-            (TransportTlv::ObjectHeader(l), TransportTlv::ObjectHeader(r)) => {
+            (Tlv::ObjectHeader(l), Tlv::ObjectHeader(r)) => {
                 assert_eq!(l.object_id, r.object_id);
-                assert_eq!(l.n_chunks, r.n_chunks);
+                assert_eq!(l.num_chunks, r.num_chunks);
                 assert_eq!(l.ack_req, r.ack_req);
                 assert_eq!(l.object_type, r.object_type);
                 assert_eq!(l.fields.len(), r.fields.len());
@@ -71,7 +71,8 @@ fn test_serialize_message_frame()
                     assert_eq!(l.fields[field_id].field_type, r.fields[field_id].field_type);
                     assert_eq!(l.fields[field_id].length, r.fields[field_id].length);
                 }
-            }
+            },
+            (_, _) => {}
         }
     }
 }
