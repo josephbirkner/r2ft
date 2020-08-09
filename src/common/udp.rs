@@ -53,11 +53,11 @@ impl Socket {
 
     /// Send payload to addr (may block).
     pub fn send(&self, payload: Buffer, addr: SocketAddr) {
-        self.sender.send_to(&payload, addr);
+        let _n_bytes_sent = self.sender.send_to(&payload, addr).expect("IP version of Socket and addr do not match.");
     }
 
     /// receives on rx (network) and sends to tx (other thread)
-    fn rx_thread(mut rx: UdpSocket, tx: Sender<Packet>, terminate: Receiver<bool>) {
+    fn rx_thread(rx: UdpSocket, tx: Sender<Packet>, terminate: Receiver<bool>) {
         loop {
             let mut buf = [0; 16];
             let (nr_of_bytes, src) = rx.recv_from(&mut buf).unwrap();
@@ -71,7 +71,7 @@ impl Socket {
     }
 
     /// spawns a receiving thread which terminates as soon as receiving anything on `terminate`
-    fn spawn_rx_thread(mut socket: UdpSocket) -> (Receiver<Packet>, Sender<bool>) {
+    fn spawn_rx_thread(socket: UdpSocket) -> (Receiver<Packet>, Sender<bool>) {
         // channel to terminate thread
         let (send_terminate, receive_terminate) = channel::<bool>();
 
