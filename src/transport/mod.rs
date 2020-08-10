@@ -68,6 +68,12 @@ impl<T: ObjectField, U: Object<T>> Connection<T, U>{
     pub fn send(&self, object: U, start: ChunkId) -> ObjectSender {
         ObjectSender{}
     }
+
+    /// Should return within about 0.1s to allow the application to interact
+    /// with the user still. 
+    /// Must be called by the application in its main loop.
+    pub fn grant_cpu(&mut self) {
+    }
 }
 
 /// Handler for an Object which is in sending transmission. 
