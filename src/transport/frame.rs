@@ -368,7 +368,7 @@ impl WireFormat for ObjectSkip {
 // ObjectAck
 
 #[derive(Default, Debug, PartialEq)]
-struct ObjectAck {
+pub struct ObjectAck {
     acknowledged_object_chunks: Vec<(ObjectId, ChunkId)>
 }
 
@@ -415,7 +415,7 @@ impl Default for ErrorCode {
 }
 
 #[derive(Default, Debug, PartialEq)]
-struct MaxMinSupportedVersion {
+pub struct MaxMinSupportedVersion {
     max_ver: Version,
     min_ver: Version
 }
@@ -434,7 +434,7 @@ impl Default for ErrorData {
 }
 
 #[derive(Default, Debug, PartialEq)]
-struct ErrorMessage {
+pub struct ErrorMessage {
     code: ErrorCode,
     detail: ErrorData
 }
@@ -488,7 +488,7 @@ impl WireFormat for ErrorMessage {
 // ObjectAckRequest
 
 #[derive(Default, Debug, PartialEq)]
-struct ObjectAckRequest {
+pub struct ObjectAckRequest {
     req_ack_object_chunks: Vec<(ObjectId, ChunkId)>
 }
 
