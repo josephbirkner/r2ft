@@ -14,6 +14,7 @@ pub type ObjectListener = fn (receiver: ObjectReceiveJob) -> ();
 /// about a timeout of a connection.
 pub type TimeoutListener = fn () -> ();
 
+/// Constructors for `Connection` are found in `super::{client, server}`.
 pub struct Connection {
     pub send_jobs: Vec<ObjectSendJob>,
     pub recv_jobs: Vec<ObjectReceiveJob>,
@@ -28,9 +29,5 @@ impl Connection{
     pub fn receive_and_send(&mut self)
     {
         todo!();
-    }
-
-    pub fn new(addr: SocketAddr, acceptor: ObjectListener, timeout_handler: TimeoutListener) -> Self {
-        !unimplemented!();
     }
 }
