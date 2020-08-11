@@ -1,10 +1,9 @@
 use clap;
 use env_logger;
+use rft::*;
 
 #[macro_use]
 mod common;
-mod client;
-mod server;
 mod transport;
 
 extern crate num;
@@ -70,7 +69,7 @@ fn main() {
 
     /*
     if let Some(matches) = matches.subcommand_matches("dl") {
-        let retcode = client::run(
+        let retcode = run_client(
             matches.value_of("server").unwrap(),
             matches.value_of("file").unwrap(),
             matches.value_of("output"),
@@ -78,7 +77,7 @@ fn main() {
         std::process::exit(retcode);
     };
     if let Some(matches) = matches.subcommand_matches("server") {
-        let retcode = server::run(matches.value_of("directory").unwrap());
+        let retcode = run_server(matches.value_of("directory").unwrap());
         std::process::exit(retcode);
     };
     */
