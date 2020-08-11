@@ -74,7 +74,7 @@ impl ObjectField for ReceivingObjectField {
 /// Is called by the transport layer to inform the application 
 /// about new connections. The server-application then returns its
 /// ObjectListener for that connection. 
-pub type ConnectionListener<T: ObjectField, U: Object<T>> = fn (incoming: Connection<T,U>) -> (ObjectListener<T,U>);
+pub type ConnectionListener<T: ObjectField, U: Object<T>> = fn (incoming: Connection<T,U>) -> ObjectListener<T,U>;
 
 /// Used by servers to listen for incoming connections.
 /// Install a ConnectionListener to be called for each new 
@@ -89,9 +89,10 @@ pub fn server_listen<T: ObjectField, U: Object<T>>(bind: SocketAddr, callback: C
 /// Non-blocking as it only creates state. The `Connection` will then 
 /// be established with handshake and everything while being granted 
 /// cpu_time by `Connection.grant_cpu()`.
-pub fn client_connect<T: ObjectField, U: Object<T>>(dest: SocketAddr, accept_callback: ObjectListener<T,U>) -> Connection<T, U> {
+pub fn client_connect<T: ObjectField, U: Object<T>>(dest: SocketAddr, accept_callback: ObjectListener<T,U>, timeout_callback: TimeoutListener) -> Connection<T, U> {
     Connection::<T, U>{
             accept_callback: accept_callback,
+            timeout_callback: timeout_callback,
             placeholder_state: std::marker::PhantomData::default(),
             placeholder_state_2: std::marker::PhantomData::default(),
     }
@@ -111,8 +112,13 @@ pub type ObjectListener<T: ObjectField, U: Object<T>> =
 /// the application. There is one ChunkListener per Object.
 pub type ChunkListener = fn (chunk: &Vec<u8>, id: ChunkId) -> ();
 
+/// Will be called by the transport layer to inform the application 
+/// about a timeout of a connection. 
+pub type TimeoutListener = fn () -> ();
+
 pub struct Connection<T: ObjectField, U: Object<T>> {
     accept_callback: ObjectListener<T,U>,
+    timeout_callback: TimeoutListener,
 
     /// required to suppress "unused" errors for T and U
     placeholder_state: std::marker::PhantomData<U>,
@@ -131,6 +137,7 @@ impl<T: ObjectField, U: Object<T>> Connection<T, U>{
     /// with the user still. 
     /// Must be called by the application in its main loop.
     pub fn grant_cpu(&mut self) {
+        todo!();
     }
 }
 
