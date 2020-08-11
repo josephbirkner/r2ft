@@ -1,18 +1,20 @@
 use clap::{App, AppSettings, Arg, SubCommand};
+use env_logger;
 
 #[macro_use]
 mod common;
-mod transport;
 mod client;
 mod server;
-mod common;
+mod transport;
 
 extern crate num;
 #[macro_use]
 extern crate num_derive;
 
-
 fn main() {
+    // Initialize logger.
+    env_logger::init();
+
     let matches = App::new("rft")
         .version("0.1.0")
         .about("RFT - a rusty Robust File Transfer protocol")
