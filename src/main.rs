@@ -1,4 +1,4 @@
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap;
 use env_logger;
 
 #[macro_use]
@@ -15,49 +15,60 @@ fn main() {
     // Initialize logger.
     env_logger::init();
 
-    let matches = App::new("rft")
-        .version("0.1.0")
-        .about("RFT - a rusty Robust File Transfer protocol")
-        .setting(AppSettings::SubcommandRequiredElseHelp)
-        .subcommand(
-            SubCommand::with_name("server")
-                .about("Start a server offering files for download.")
-                .arg(
-                    Arg::with_name("directory")
-                        .index(1)
-                        .help("Directory to serve files from.")
-                        .takes_value(true)
-                        .default_value("./"),
-                ),
+    // Specify command line interface:
+    let matches = clap::App::new(clap::crate_name!())
+        .version(clap::crate_version!())
+        .author(clap::crate_authors!("\n"))
+        .about("RFT - a rust implementation of the SOFT protocol")
+        .settings(&[clap::AppSettings::DeriveDisplayOrder, clap::AppSettings::StrictUtf8])
+        // Options according to Lecture slides:
+        .arg(clap::Arg::with_name("s")
+            .short("s")
+            .help("server mode: accept incoming files from any host\nOperate in client mode if “–s” is not specified")
+            .required(true)
+            .conflicts_with_all(&["host","file", "list"])
         )
-        .subcommand(
-            SubCommand::with_name("dl")
-                .alias("download")
-                .about("Download a file from a server.")
-                .arg(
-                    Arg::with_name("server")
-                        .index(1)
-                        .help("Server address to connect to.")
-                        .takes_value(true)
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("file")
-                        .index(2)
-                        .help("The remote files path.")
-                        .takes_value(true)
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .help("Local destination for the downloaded file.")
-                        .takes_value(true),
-                ),
+        .arg(clap::Arg::with_name("host")
+            .help("the host to send to or request from (hostname or IPv4 address)")
+            .index(1)
+            .required(true)
+            .takes_value(true)
+            .conflicts_with("s")
+        )
+        .arg(clap::Arg::with_name("t")
+            .short("t")
+            .help("specify the port number to use (use a default if not given)")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("p")
+            .short("p")
+            .help("'Packet n not Lost':\nspecify the loss probabilities for the Markov chain model\nif only one is specified, assume p=q; if neither is specified assume no\nloss")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("q")
+            .short("q")
+            .help("'Packet n lost':\nspecify the loss probabilities for the Markov chain model\nif only one is specified, assume p=q; if neither is specified assume no\nloss")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("file")
+            .help("the name of the file(s) to fetch")
+            .index(2)
+            .multiple(true)
+            .required(true)
+            .takes_value(true)
+            .conflicts_with_all(&["s", "list"])
+        )
+        // Other options:
+        .arg(clap::Arg::with_name("list")
+            .help("file list retrival")
+            .short("l")
+            .required(true)
+            .takes_value(true)
+            .conflicts_with_all(&["s", "file"])
         )
         .get_matches();
 
+    /*
     if let Some(matches) = matches.subcommand_matches("dl") {
         let retcode = client::run(
             matches.value_of("server").unwrap(),
@@ -70,4 +81,5 @@ fn main() {
         let retcode = server::run(matches.value_of("directory").unwrap());
         std::process::exit(retcode);
     };
+    */
 }
