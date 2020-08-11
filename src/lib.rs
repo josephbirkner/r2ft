@@ -1,6 +1,8 @@
 //! # RFT
 //! Rust implementation of the SOFT (Simple One-Directional File Transfer) protocol.
 
+pub mod options;
+
 /*
  * return exit code of executable
  */
