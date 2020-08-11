@@ -239,10 +239,12 @@ impl WireFormat for FileMetadata {
                         let mut num_bytes = read_u8!(cursor);
                         while num_bytes > 0 {
                             buf.push(read_u8!(cursor));
+                            num_bytes -= 1;
                         }
                         buf
                     }
                 });
+                num_entries -= 1;
             }
         });
         ReadResult::Ok
@@ -270,6 +272,7 @@ impl WireFormat for FileContent {
             let mut num_bytes = read_u16!(cursor);
             while num_bytes > 0 {
                 self.content.push(read_u8!(cursor));
+                num_bytes -= 1;
             }
         });
         ReadResult::Ok
