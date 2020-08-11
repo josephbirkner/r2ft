@@ -67,18 +67,65 @@ fn main() {
         )
         .get_matches();
 
-    /*
-    if let Some(matches) = matches.subcommand_matches("dl") {
-        let retcode = run_client(
-            matches.value_of("server").unwrap(),
-            matches.value_of("file").unwrap(),
-            matches.value_of("output"),
-        );
-        std::process::exit(retcode);
-    };
-    if let Some(matches) = matches.subcommand_matches("server") {
-        let retcode = run_server(matches.value_of("directory").unwrap());
-        std::process::exit(retcode);
-    };
-    */
+    // Parse command line options and call run methods:
+
+    let opt;
+    match options::Options::parse(
+        matches.value_of("t"),
+        matches.value_of("p"),
+        matches.value_of("q"),
+    ) {
+        Err(e) => {
+            eprintln!("Error while parsing command line options: {}", e);
+            std::process::exit(1);
+        }
+        Ok(o) => opt = o,
+    }
+
+    if matches.is_present("s") {
+        // server mode
+        std::process::exit(match run_server(opt) {
+            Ok(_) => 0,
+            Err(e) => {
+                eprintln!("{:?}", e);
+                1
+            }
+        });
+    } else {
+        // client mode
+
+        let socket_addr;
+        match options::parse_host(matches.value_of("host").unwrap()) {
+            // unwrap() used since clap arg constraints should ensure that a host is present
+            Err(e) => {
+                eprintln!("Error while parsing command line options (host): {}", e);
+                std::process::exit(1);
+            }
+            Ok(o) => socket_addr = o,
+        }
+
+        if matches.is_present("list") {
+            // file list client
+            let directory = matches.value_of("list").unwrap(); // unwrap() used since clap arg constraints should ensure that a directory is present
+
+            std::process::exit(match run_ls_client(opt, socket_addr, directory) {
+                Ok(_) => 0,
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    1
+                }
+            });
+        } else {
+            // regular client
+            let files = matches.values_of("file").unwrap().collect(); // unwrap() used since clap arg constraints should ensure that files are present
+
+            std::process::exit(match run_client(opt, socket_addr, files) {
+                Ok(_) => 0,
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    1
+                }
+            });
+        }
+    }
 }
