@@ -5,6 +5,7 @@ mod frame;
 mod test;
 
 use frame::*;
+use std::net::SocketAddr;
 
 pub const CHUNKSIZE: usize = 512; ///maximum chunksize in bytes.
 
@@ -68,16 +69,50 @@ impl ObjectField for ReceivingObjectField {
 }
 
 //////////////////////////
+// Establishing a connection.
+
+/// Is called by the transport layer to inform the application 
+/// about new connections. The server-application then returns its
+/// ObjectListener for that connection. 
+pub type ConnectionListener<T: ObjectField, U: Object<T>> = fn (incoming: Connection<T,U>) -> (ObjectListener<T,U>);
+
+/// Used by servers to listen for incoming connections.
+/// Install a ConnectionListener to be called for each new 
+/// incoming connection. Will listen at `bind`.
+/// Non-blocking.
+pub fn server_listen<T: ObjectField, U: Object<T>>(bind: SocketAddr, callback: ConnectionListener<T, U>) -> () {
+    todo!();
+}
+
+/// Called by an application to create a `Connection`. Will bind 
+/// to `0.0.0.0:random` as src addr.
+/// Non-blocking as it only creates state. The `Connection` will then 
+/// be established with handshake and everything while being granted 
+/// cpu_time by `Connection.grant_cpu()`.
+pub fn client_connect<T: ObjectField, U: Object<T>>(dest: SocketAddr, accept_callback: ObjectListener<T,U>) -> Connection<T, U> {
+    Connection::<T, U>{
+            accept_callback: accept_callback,
+            placeholder_state: std::marker::PhantomData::default(),
+            placeholder_state_2: std::marker::PhantomData::default(),
+    }
+}
+
+//////////////////////////
 // The Connection handlers.
 
+/// Will be called by the transport layer to notify the application 
+/// about new receiving Objects. 
+/// The application returns None, if it is not interested in the Object. 
+/// Otherwise the application returns its ChunkListener for that Object.
+pub type ObjectListener<T: ObjectField, U: Object<T>> = 
+    fn (receiver: ObjectReceiver<T, U>) -> Option<ChunkListener>;
+
+/// Will be called by the transport layer to pass a chunk on to 
+/// the application. There is one ChunkListener per Object.
+pub type ChunkListener = fn (chunk: &Vec<u8>, id: ChunkId) -> ();
+
 pub struct Connection<T: ObjectField, U: Object<T>> {
-    /// Called by the transport layer to notify the application 
-    /// about new receiving Objects. 
-    /// The application returns None, if it is not interested in the Object. 
-    /// Otherwise the application returns a function allowing the transport 
-    /// layer to pass the chunks of this Object on.
-    accept_callback: fn (receiver: ObjectReceiver<T, U>) -> 
-        Option<fn (chunk: &Vec<u8>, id: ChunkId) -> ()>,
+    accept_callback: ObjectListener<T,U>,
 
     /// required to suppress "unused" errors for T and U
     placeholder_state: std::marker::PhantomData<U>,
@@ -85,18 +120,6 @@ pub struct Connection<T: ObjectField, U: Object<T>> {
 }
 
 impl<T: ObjectField, U: Object<T>> Connection<T, U>{
-    pub fn new(
-        accept_callback: fn (receiver: ObjectReceiver<T, U>) -> 
-        Option<fn (chunk: &Vec<u8>, id: ChunkId) -> ()>,
-        ) -> Connection<T, U> {
-
-        Connection::<T, U>{
-            accept_callback: accept_callback,
-            placeholder_state: std::marker::PhantomData::default(),
-            placeholder_state_2: std::marker::PhantomData::default(),
-        }
-    }
-
     /// nonblocking.
     ///
     /// start off with chunk number `start`
