@@ -76,7 +76,7 @@ fn main() {
 
     if matches.is_present("s") {
         // server mode
-        std::process::exit(match run_server(opt) {
+        std::process::exit(match app::server::run(opt) {
             Ok(_) => 0,
             Err(e) => {
                 eprintln!("{:?}", e);
@@ -100,7 +100,7 @@ fn main() {
             // file list client
             let directory = matches.value_of("list").unwrap(); // unwrap() used since clap arg constraints should ensure that a directory is present
 
-            std::process::exit(match run_ls_client(opt, socket_addr, directory) {
+            std::process::exit(match app::ls::ls(opt, socket_addr, directory) {
                 Ok(_) => 0,
                 Err(e) => {
                     eprintln!("{:?}", e);
@@ -111,7 +111,7 @@ fn main() {
             // regular client
             let files = matches.values_of("file").unwrap().collect(); // unwrap() used since clap arg constraints should ensure that files are present
 
-            std::process::exit(match run_client(opt, socket_addr, files) {
+            std::process::exit(match app::get::get(opt, socket_addr, files) {
                 Ok(_) => 0,
                 Err(e) => {
                     eprintln!("{:?}", e);

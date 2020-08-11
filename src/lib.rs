@@ -6,9 +6,9 @@ extern crate num;
 extern crate num_derive;
 
 #[macro_use]
-mod common;
-mod transport;
-mod app;
+pub mod common;
+pub mod transport;
+pub mod app;
 pub mod options;
 
 #[cfg(test)]

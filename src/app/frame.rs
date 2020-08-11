@@ -41,7 +41,7 @@ pub fn parse(cursor: &mut Cursor) -> AppTlvParseResult {
 
 #[derive(FromPrimitive, ToPrimitive, Debug, PartialEq)]
 #[repr(u8)]
-pub enum ObjectType {
+pub enum AppObjectType {
     FileRequest = 0x10,
     FileResponse = 0x11,
     ErrorReport = 0x12,
@@ -51,7 +51,7 @@ pub enum ObjectType {
 
 #[derive(FromPrimitive, ToPrimitive, Debug, PartialEq)]
 #[repr(u8)]
-pub enum ObjectFieldType {
+pub enum AppObjectFieldType {
     FileRequestSend = 0x20,
     FileRequestResume = 0x21,
     FileResponseMetadata = 0x22,
