@@ -1,5 +1,6 @@
 use crate::transport::jobs::*;
 use std::net::SocketAddr;
+use crate::common::udp::{Socket, Packet};
 
 //////////////////////////
 // Connection
@@ -20,6 +21,7 @@ pub struct Connection {
     pub recv_jobs: Vec<ObjectReceiveJob>,
     accept_callback: ObjectListener,
     timeout_callback: TimeoutListener,
+    socket: Socket,
 }
 
 impl Connection{
@@ -30,4 +32,9 @@ impl Connection{
     {
         todo!();
     }
+}
+
+impl Default for Connection {
+    fn default() -> Self {
+            }
 }
