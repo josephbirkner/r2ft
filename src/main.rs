@@ -2,15 +2,6 @@ use clap;
 use env_logger;
 use rft::*;
 
-#[macro_use]
-mod common;
-mod transport;
-mod app;
-
-extern crate num;
-#[macro_use]
-extern crate num_derive;
-
 fn main() {
     // Initialize logger.
     env_logger::init();

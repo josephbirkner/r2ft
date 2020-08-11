@@ -1,11 +1,21 @@
 //! # RFT
 //! Rust implementation of the SOFT (Simple One-Directional File Transfer) protocol.
 
+extern crate num;
+#[macro_use]
+extern crate num_derive;
+
+#[macro_use]
+mod common;
+mod transport;
+mod app;
 pub mod options;
 
 use log::info;
 use options::Options;
 use std::net::SocketAddr;
+use transport::connection::*;
+
 
 /// Run server on current working directory
 pub fn run_server(opt: Options) -> std::result::Result<(), ()> {
@@ -34,16 +44,7 @@ pub fn run_client(
     socket_addr: SocketAddr,
     files: Vec<&str>,
 ) -> std::result::Result<(), ()> {
-    info!(
-        "File client startet with {} for socket address {} and file(s):",
-        opt, socket_addr
-    );
-    for file in &files {
-        info!(" {}", file);
-    }
-    info!("\n");
-    unimplemented!();
-    Ok(())
+    !unimplemented!()
 }
 
 #[cfg(test)]

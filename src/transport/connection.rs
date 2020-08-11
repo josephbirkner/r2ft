@@ -1,4 +1,5 @@
 use crate::transport::jobs::*;
+use std::net::SocketAddr;
 
 //////////////////////////
 // Connection
@@ -14,6 +15,8 @@ pub type ObjectListener = fn (receiver: ObjectReceiveJob) -> ();
 pub type TimeoutListener = fn () -> ();
 
 pub struct Connection {
+    pub send_jobs: Vec<ObjectSendJob>,
+    pub recv_jobs: Vec<ObjectReceiveJob>,
     accept_callback: ObjectListener,
     timeout_callback: TimeoutListener,
 }
@@ -22,11 +25,12 @@ impl Connection{
     /// Should return within about 0.1s to allow the application to interact
     /// with the user still.
     /// Must be called by the application in its main loop.
-    pub fn receive_and_send(
-        &mut self,
-        send_jobs: &mut Vec<ObjectSendJob>,
-        recv_jobs: &mut Vec<ObjectReceiveJob>)
+    pub fn receive_and_send(&mut self)
     {
         todo!();
+    }
+
+    pub fn new(addr: SocketAddr, acceptor: ObjectListener, timeout_handler: TimeoutListener) -> Self {
+        !unimplemented!();
     }
 }
