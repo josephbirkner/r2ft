@@ -5,6 +5,7 @@ use rft::*;
 #[macro_use]
 mod common;
 mod transport;
+mod app;
 
 extern crate num;
 #[macro_use]

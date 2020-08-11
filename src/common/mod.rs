@@ -123,6 +123,22 @@ macro_rules! read_tlv {
     };
 }
 
+macro_rules! read_str {
+    ($cursor:ident) => {{
+        let mut buf_len = read_u128!($cursor);
+        let mut buf = Vec::new();
+        buf.reserve(buf_len as usize);
+        while buf_len > 0 {
+            buf.push(read_u8!($cursor));
+            buf_len -= 1;
+        }
+        match String::from_utf8(buf) {
+            Ok(val) => val,
+            _ => return ReadResult::Err(ReadError::new(""))
+        }
+    }};
+}
+
 /////////////////////////////////
 // Serialization macros
 
@@ -163,7 +179,7 @@ macro_rules! write_i128 {
 }
 
 macro_rules! write_tlv {
-    ($cursor:ident, $type_code:expr, $write_block:block) => {
+    ($cursor:ident, $type_code:expr, $write_block:block) => {{
         write_u8!($cursor, $type_code as u8);
         let mut length = $cursor.position();
         write_u16!($cursor, 0);
@@ -173,5 +189,13 @@ macro_rules! write_tlv {
         length -= 2; // -2 bc. of 2B length-field length
         write_u16!($cursor, length as u16);
         $cursor.seek(SeekFrom::Current(length as i64)).expect("seek failed.");
+    }};
+}
+
+macro_rules! write_str {
+    ($cursor:ident, $value:expr) => {
+        let buf = $value.clone().into_bytes();
+        write_u128!($cursor, buf.len() as u64);
+        $cursor.write(&buf);
     };
 }

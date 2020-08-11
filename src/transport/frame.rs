@@ -4,8 +4,6 @@ use leb128;
 use crate::common::fnv1a32;
 use crate::common::*;
 use num::{FromPrimitive, ToPrimitive};
-use crate::transport::frame::ErrorCode::{ChecksumError, UnsupportedVersion, ObjectAbort};
-use std::convert::TryInto;
 
 /////////////////////////////////
 // Basic Types
@@ -60,7 +58,7 @@ impl WireFormat for MessageFrame {
                 Some(TlvType::ObjectAckRequest) => Tlv::ObjectAckRequest(ObjectAckRequest::default()),
                 None => return ReadResult::Err(
                     ReadError::new(
-                        format!("Unknown object type code {}!", tlv_type).as_str())),
+                        format!("Unknown transport message type code {}!", tlv_type).as_str())),
             };
             tlv.read(cursor);
             self.tlvs.push(tlv);
@@ -464,7 +462,7 @@ impl WireFormat for ErrorMessage {
     fn read(&mut self, cursor: &mut Cursor) -> ReadResult {
         read_tlv!(cursor, TlvType::ObjectChunk, {
             self.code = FromPrimitive::from_u8(read_u8!(cursor)).unwrap();
-            self.detail = match self.code {
+            self.detail = match &self.code {
                 UnsupportedVersion => ErrorData::UnsupportedVersion(MaxMinSupportedVersion{
                     max_ver: read_u8!(cursor),
                     min_ver: read_u8!(cursor)
@@ -511,7 +509,8 @@ impl WireFormat for ObjectAckRequest {
             self.req_ack_object_chunks.reserve(num_acks as usize);
             while num_acks > 0 {
                 self.req_ack_object_chunks.push((
-                    read_u64!(cursor), read_i128!(cursor)
+                    read_u64!(cursor),
+                    read_i128!(cursor)
                 ));
             }
         });
