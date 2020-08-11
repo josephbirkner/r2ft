@@ -8,6 +8,7 @@ pub use std::str::FromStr;
 
 pub mod fnv1a32;
 pub mod udp;
+pub mod mtu;
 
 /////////////////////////////////
 // Basic Types
