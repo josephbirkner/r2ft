@@ -3,17 +3,47 @@
 
 pub mod options;
 
-/*
- * return exit code of executable
- */
-pub fn run_client(server: &str, path: &str, dest: Option<&str>) -> i32 {
-    println!("download stub");
-    return 0;
+use log::info;
+use options::Options;
+use std::net::SocketAddr;
+
+/// Run server on current working directory
+pub fn run_server(opt: Options) -> std::result::Result<(), ()> {
+    info!("Server startet with {}", opt);
+    unimplemented!();
+    Ok(())
 }
 
-pub fn run_server(directory: &str) -> i32 {
-    println!("server stub");
-    return 0;
+/// Run client for file list retrieval.
+pub fn run_ls_client(
+    opt: Options,
+    socket_addr: SocketAddr,
+    directory: &str,
+) -> std::result::Result<(), ()> {
+    info!(
+        "File list client startet with {} for socket address {} and directory {}",
+        opt, socket_addr, directory
+    );
+    unimplemented!();
+    Ok(())
+}
+
+/// Run client for file retrieval.
+pub fn run_client(
+    opt: Options,
+    socket_addr: SocketAddr,
+    files: Vec<&str>,
+) -> std::result::Result<(), ()> {
+    info!(
+        "File client startet with {} for socket address {} and file(s):",
+        opt, socket_addr
+    );
+    for file in &files {
+        info!(" {}", file);
+    }
+    info!("\n");
+    unimplemented!();
+    Ok(())
 }
 
 #[cfg(test)]
