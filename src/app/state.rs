@@ -4,12 +4,11 @@ use crate::options::Options;
 use crate::transport::frame::*;
 use crate::transport::jobs::*;
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
-use std::path::Path;
-
 use itertools::Chunk;
 use log::error;
 use log::info;
 use num::{FromPrimitive, ToPrimitive};
+use sha3::{Digest, Sha3_512};
 use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
@@ -17,6 +16,7 @@ use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::SocketAddr;
 use std::ops::{Deref, DerefMut};
+use std::path::Path;
 use std::process::exit;
 use std::rc::Rc;
 
@@ -318,6 +318,24 @@ impl StateMachine {
                                     cursor.into_inner()
                                 },
                             },
+                            /*MetadataEntry {
+                                code: MetadataEntryType::SHA3,
+                                content: {
+                                    let mut hasher = Sha3_512::new();
+
+                                    let mut buffer = Vec::new();
+
+                                    send_state.device.read_to_end(&mut buffer).unwrap();
+
+                                    hasher.update(buffer);
+
+                                    let result = hasher.finalize();
+
+                                    let mut cursor = Cursor::new(Vec::new());
+                                    cursor.write(&result[..]);
+                                    cursor.into_inner()
+                                },
+                            },*/
                         ],
                     }),
                     _ => AppTlv::FileContent(FileContent {
