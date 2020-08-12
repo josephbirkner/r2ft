@@ -14,14 +14,14 @@ pub type ObjectListener = fn (receiver: ObjectReceiveJob) -> ();
 
 /// Will be called by the transport layer to inform the application
 /// about a timeout of a connection.
-pub type TimeoutListener = fn () -> ();
+pub type TimeoutListener = FnMut () -> ();
 
 /// Constructors for `Connection` are found in `super::{client, server}`.
 pub struct Connection {
     pub send_jobs: Vec<ObjectSendJob>,
     pub recv_jobs: Vec<ObjectReceiveJob>,
-    accept_callback: ObjectListener,
-    timeout_callback: TimeoutListener,
+    accept_callback: Box<ObjectListener>,
+    timeout_callback: Box<TimeoutListener>,
     socket: UdpSocket,
     /// Target of communication to send to.
     dest: SocketAddr,
