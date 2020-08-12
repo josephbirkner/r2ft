@@ -1,9 +1,8 @@
-use crate::common::fnv1a32;
 use crate::common::*;
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
 use leb128;
 use num::{FromPrimitive, ToPrimitive};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom, Write};
 
 /////////////////////////////////
 // Basic Types/Functions

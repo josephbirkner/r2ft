@@ -1,19 +1,17 @@
 use super::state::*;
 use crate::options::Options;
-use crate::transport::server;
 use crate::transport::server::Listener;
-use log::info;
 use std::cell::RefCell;
 use std::env::current_dir;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::rc::Rc;
+use log::*;
 
 /// Run server on current working directory
 pub fn run(opt: Options) -> std::result::Result<(), ()> {
     //////////////////////////////
     // Server client startup.
-    let mut s = format!(
-        "File server started with {}, working directory {}",
+    info!("File server started with {}, working directory {}",
         opt,
         current_dir().unwrap().display()
     );
@@ -25,7 +23,7 @@ pub fn run(opt: Options) -> std::result::Result<(), ()> {
     //////////////////////////////
     // Create server for listening
     let mut server = Listener::new(SocketAddr::V4(SocketAddrV4::new(
-        Ipv4Addr::new(0, 0, 0, 0),
+        Ipv4Addr::new(127, 0, 0, 1),
         opt.port,
     )));
 

@@ -1,14 +1,10 @@
 use super::frame::*;
-use crate::common::udp::{Packet, Socket};
 use crate::common::{Cursor, ReadResult, WireFormat};
-use crate::transport::client::connect;
 use crate::transport::common::*;
 use crate::transport::jobs::*;
 use log;
 use rand::{thread_rng, Rng};
-use std::iter::Iterator;
 use std::net::{SocketAddr, UdpSocket};
-use std::rc::Rc;
 
 //////////////////////////
 // Connection
@@ -64,7 +60,7 @@ impl Connection {
     fn send_once(&mut self, i: usize) {
         //let mut job: ObjectSendJob = self.send_jobs.remove(i);
         // get session or return
-        let mut session: &EstablishedState;
+        let session: &EstablishedState;
         if let Some(s) = &self.session {
             session = s;
         } else {

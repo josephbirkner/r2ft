@@ -10,13 +10,12 @@ extern crate digest;
 extern crate generic_array;
 
 use crate::common::Cursor;
-use byteorder::ReadBytesExt;
 use core::hash::Hasher;
 #[cfg(feature = "generic")]
 use digest;
 #[cfg(feature = "generic")]
 use generic_array;
-use std::io::{Read, Seek, Write};
+use std::io::{Read};
 
 const FNV_OFFSET: u32 = 0x811C9DC5;
 const FNV_PRIME: u32 = 0x01000193;
@@ -117,6 +116,7 @@ mod test {
 
     use super::{Fnv32a, Hasher};
 
+    #[allow(unused)]
     fn test(a: u32, b: &[u8]) {
         println!("\nTesting {:?}.", String::from_utf8_lossy(b));
         let mut hasher = Fnv32a::default();

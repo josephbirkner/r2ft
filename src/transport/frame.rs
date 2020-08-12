@@ -3,7 +3,7 @@ use crate::common::*;
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
 use leb128;
 use num::{FromPrimitive, ToPrimitive};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom, Write};
 
 /////////////////////////////////
 // Basic Types
@@ -489,11 +489,11 @@ impl WireFormat for ErrorMessage {
         read_tlv!(cursor, TlvType::ObjectChunk, {
             self.code = FromPrimitive::from_u8(read_u8!(cursor)).unwrap();
             self.detail = match &self.code {
-                UnsupportedVersion => ErrorData::UnsupportedVersion(MaxMinSupportedVersion {
+                ErrorCode::UnsupportedVersion => ErrorData::UnsupportedVersion(MaxMinSupportedVersion {
                     max_ver: read_u8!(cursor),
                     min_ver: read_u8!(cursor),
                 }),
-                ObjectAbort => {
+                ErrorCode::ObjectAbort => {
                     let mut result = Vec::new();
                     let mut num_aborted_object_ids = read_u8!(cursor);
                     result.reserve(num_aborted_object_ids as usize);

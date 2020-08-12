@@ -1,23 +1,16 @@
 use crate::app::frame::*;
 use crate::common::*;
-use crate::options::Options;
 use crate::transport::frame::*;
 use crate::transport::jobs::*;
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
-use itertools::Chunk;
-use log::error;
-use log::info;
 use num::{FromPrimitive, ToPrimitive};
-use sha3::{Digest, Sha3_512};
 use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::net::SocketAddr;
+use std::io::{Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::process::exit;
 use std::rc::Rc;
 
 const DEFAULT_CHUNK_SIZE: u64 = 512;
@@ -59,7 +52,7 @@ impl FileRecvState {
                         }
                     };
                     log::info!(" Got a file name: {}", self.name);
-                    let mut file = fs::File::create(self.name.to_string()).unwrap();
+                    let file = fs::File::create(self.name.to_string()).unwrap();
                     if self.size > 0 {
                         file.set_len(self.size);
                     }
@@ -251,7 +244,7 @@ impl StateMachine {
     }
 
     pub fn push_file_send_job(&mut self, file_path: String) {
-        let mut file = match fs::File::open(file_path.clone()) {
+        let file = match fs::File::open(file_path.clone()) {
             Ok(file_obj) => file_obj,
             Err(e) => {
                 log::error!("Failed to open {}", file_path);
@@ -358,7 +351,7 @@ impl StateMachine {
                             send_state.device.seek(SeekFrom::Start(start_pos as u64));
                             let end_pos =
                                 min(start_pos + DEFAULT_CHUNK_SIZE as i64, meta.len() as i64);
-                            for i in start_pos..end_pos {
+                            for _ in start_pos..end_pos {
                                 result.push(send_state.device.read_u8().unwrap());
                             }
                             result

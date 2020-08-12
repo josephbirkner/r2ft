@@ -1,4 +1,3 @@
-use crate::common::udp::Socket;
 use crate::transport::common::default_host_info;
 use crate::transport::connection::*;
 use std::net::{SocketAddr, UdpSocket};

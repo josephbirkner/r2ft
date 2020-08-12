@@ -1,4 +1,3 @@
-use crate::common::mtu;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::thread;

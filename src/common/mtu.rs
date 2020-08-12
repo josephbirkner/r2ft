@@ -1,4 +1,4 @@
-use std::fs::{metadata, read_dir, read_to_string};
+use std::fs::{read_dir, read_to_string};
 use std::option::Option;
 
 /// 0xffff - (sizeof(IP Header) + sizeof(UDP Header)) = 65535-(20+8) = 65507
