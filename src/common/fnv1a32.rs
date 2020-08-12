@@ -70,13 +70,17 @@ impl Fnv32a {
 
     /// return 32bit FNV1a hash of `cursor` between `from` until excluding `to`
     pub fn hash(cursor: &mut Cursor, from: u64, to: u64) -> u32 {
+        let pos = cursor.position();
+        
         let mut hasher = Fnv32a::default();
         let mut byte: [u8; 1] = [0];
+        cursor.set_position(from);
         for _ in from..to {
             cursor.read_exact(&mut byte);
             hasher.write(&byte);
         }
         
+        cursor.set_position(pos);
         return hasher.finish() as u32;
     }
 
