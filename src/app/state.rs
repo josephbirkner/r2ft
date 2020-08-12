@@ -321,19 +321,25 @@ impl StateMachine {
                             /*MetadataEntry {
                                 code: MetadataEntryType::SHA3,
                                 content: {
-                                    let mut hasher = Sha3_512::new();
-
                                     let mut buffer = Vec::new();
 
-                                    send_state.device.read_to_end(&mut buffer).unwrap();
+                                    match send_state.device.read_to_end(&mut buffer) {
+                                        Err(e) => {
+                                            todo!("Implement error handling.");
+                                            error!("Could not produce hash for file.");
+                                            vec![0x00; 64]
+                                        }
+                                        Ok(_) => {
+                                            let mut hasher = Sha3_512::new();
+                                            hasher.update(buffer);
 
-                                    hasher.update(buffer);
+                                            let result = hasher.finalize();
 
-                                    let result = hasher.finalize();
-
-                                    let mut cursor = Cursor::new(Vec::new());
-                                    cursor.write(&result[..]);
-                                    cursor.into_inner()
+                                            let mut cursor = Cursor::new(Vec::new());
+                                            cursor.write(&result[..]);
+                                            cursor.into_inner()
+                                        }
+                                    }
                                 },
                             },*/
                         ],
