@@ -13,9 +13,11 @@ pub struct Object {
     transmission_finished_callback: TransmissionFinishedListener,
 }
 
-/// Called by connection while it is working
+/// Called by transport layer while it is working
 /// on an ObjectSendJob.
-pub type ChunkProvider = fn (chunk_id: ChunkId) -> Vec<u8>;
+/// Number of application tlvs in this chunk are returned in as second 
+/// element of the tuple.
+pub type ChunkProvider = fn (chunk_id: ChunkId) -> (Vec<u8>, u8);
 
 /// Called by connection once transfer is done.
 pub type TransmissionFinishedListener = fn() -> ();
@@ -56,7 +58,8 @@ impl ObjectSendJob {
 
 /// Will be called by the transport layer to pass a chunk on to
 /// the application. There is one ChunkListener per Object.
-pub type ChunkListener = fn (chunk: &Vec<u8>, id: ChunkId) -> ();
+/// Number of application tlvs in this chunk in `nr_tlv`.
+pub type ChunkListener = fn (chunk: &Vec<u8>, id: ChunkId, nr_tlv: u8) -> ();
 
 pub struct ObjectReceiveJob {
     pub chunk_received_callback: ChunkListener,
