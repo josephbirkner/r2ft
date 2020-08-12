@@ -7,6 +7,7 @@ fn main() {
     env_logger::init();
 
     // Specify command line interface:
+    #[allow(deprecated)]
     let matches = clap::App::new(clap::crate_name!())
         .version(clap::crate_version!())
         .author(clap::crate_authors!("\n"))
