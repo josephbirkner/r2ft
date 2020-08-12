@@ -1,7 +1,7 @@
-use std::net::{SocketAddr, UdpSocket};
-use crate::common::udp::{Socket};
-use crate::transport::connection::*;
+use crate::common::udp::Socket;
 use crate::transport::common::default_host_info;
+use crate::transport::connection::*;
+use std::net::{SocketAddr, UdpSocket};
 
 use rand::{thread_rng, Rng};
 
@@ -10,7 +10,11 @@ use rand::{thread_rng, Rng};
 /// Non-blocking as it only creates state. The `Connection` will then
 /// be established with handshake and everything while being granted
 /// cpu_time by `Connection.grant_cpu()`.
-pub fn connect(dest: SocketAddr, accept_callback: Box<ObjectListener>, timeout_callback: Box<TimeoutListener>) -> Connection {
+pub fn connect(
+    dest: SocketAddr,
+    accept_callback: Box<ObjectListener>,
+    timeout_callback: Box<TimeoutListener>,
+) -> Connection {
     // bind to a random local port from ephemeral port range
     let bind: SocketAddr = "0.0.0.0:0".parse().unwrap();
     let port: u16 = thread_rng().gen_range(49152, 65535);

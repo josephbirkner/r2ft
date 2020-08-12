@@ -1,13 +1,13 @@
-use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
-use std::thread;
-use std::net::{UdpSocket, SocketAddr};
 use crate::common::mtu;
+use std::net::{SocketAddr, UdpSocket};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::thread;
 
 type Buffer = [u8; 16];
 
 /// UdpPacket with a buffer filled up to usize sent by SocketAddr.
 #[derive(Debug)]
-pub struct Packet (pub Buffer, pub usize, pub SocketAddr);
+pub struct Packet(pub Buffer, pub usize, pub SocketAddr);
 
 impl PartialEq for Packet {
     fn eq(&self, other: &Self) -> bool {
@@ -29,32 +29,34 @@ impl Drop for Socket {
 }
 
 impl Socket {
- 
     pub fn bind(addr: SocketAddr) -> Socket {
         let read_socket: UdpSocket = UdpSocket::bind(addr).expect("Unable to bind to address");
         let write_socket: UdpSocket = read_socket.try_clone().expect("Unable to clone socket");
 
         let (receiver, send_terminate) = Socket::spawn_rx_thread(read_socket);
 
-        return Socket{ 
+        return Socket {
             terminate_thread: send_terminate,
             receiver: receiver,
             sender: write_socket,
         };
     }
 
-    /// Receive non-blockingly. 
+    /// Receive non-blockingly.
     pub fn try_recv(&self) -> Option<Packet> {
         match self.receiver.try_recv() {
             Ok(m) => Some(m),
             Err(TryRecvError::Disconnected) => panic!("Receiver thread dead"),
-            Err(TryRecvError::Empty) => None
+            Err(TryRecvError::Empty) => None,
         }
     }
 
     /// Send payload to addr (may block).
     pub fn send(&self, payload: Buffer, addr: SocketAddr) {
-        let _n_bytes_sent = self.sender.send_to(&payload, addr).expect("IP version of Socket and addr do not match.");
+        let _n_bytes_sent = self
+            .sender
+            .send_to(&payload, addr)
+            .expect("IP version of Socket and addr do not match.");
     }
 
     /// receives on rx (network) and sends to tx (other thread)
@@ -84,11 +86,10 @@ impl Socket {
     }
 }
 
-
 mod test {
     #[test]
     fn test_threads() {
-        use super::{Socket, Buffer, Packet};
+        use super::{Buffer, Packet, Socket};
 
         let a_addr = "0.0.0.0:12057".parse().unwrap();
         let b_addr = "0.0.0.0:3333".parse().unwrap();
@@ -105,7 +106,7 @@ mod test {
         a.send(sent, dest);
         std::thread::sleep(std::time::Duration::from_secs_f32(0.1));
         assert_eq!(b.try_recv(), Some(Packet(sent, 16 as usize, src)));
-        
+
         // receive nothing and return immediately
         assert_eq!(b.try_recv(), None);
     }

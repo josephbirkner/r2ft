@@ -1,9 +1,9 @@
-use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
-use std::io::{Seek, SeekFrom, Write, Read};
-use leb128;
 use crate::common::fnv1a32;
 use crate::common::*;
+use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
+use leb128;
 use num::{FromPrimitive, ToPrimitive};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 /////////////////////////////////
 // Basic Types
@@ -47,7 +47,9 @@ impl WireFormat for MessageFrame {
         let mut num_tlvs = read_u8!(cursor);
         while num_tlvs > 0 {
             let tlv_type = read_u8!(cursor);
-            cursor.seek(SeekFrom::Current(-1)).expect("Seek back failed."); // TLV will read type again.
+            cursor
+                .seek(SeekFrom::Current(-1))
+                .expect("Seek back failed."); // TLV will read type again.
             let mut tlv = match FromPrimitive::from_u8(tlv_type) {
                 Some(TlvType::HostInformation) => Tlv::HostInformation(HostInformation::default()),
                 Some(TlvType::ObjectHeader) => Tlv::ObjectHeader(ObjectHeader::default()),
@@ -55,10 +57,14 @@ impl WireFormat for MessageFrame {
                 Some(TlvType::ObjectSkip) => Tlv::ObjectSkip(ObjectSkip::default()),
                 Some(TlvType::ObjectAck) => Tlv::ObjectAck(ObjectAck::default()),
                 Some(TlvType::ErrorMessage) => Tlv::ErrorMessage(ErrorMessage::default()),
-                Some(TlvType::ObjectAckRequest) => Tlv::ObjectAckRequest(ObjectAckRequest::default()),
-                None => return ReadResult::Err(
-                    ReadError::new(
-                        format!("Unknown transport message type code {}!", tlv_type).as_str())),
+                Some(TlvType::ObjectAckRequest) => {
+                    Tlv::ObjectAckRequest(ObjectAckRequest::default())
+                }
+                None => {
+                    return ReadResult::Err(ReadError::new(
+                        format!("Unknown transport message type code {}!", tlv_type).as_str(),
+                    ))
+                }
             };
             tlv.read(cursor);
             self.tlvs.push(tlv);
@@ -68,7 +74,7 @@ impl WireFormat for MessageFrame {
         let checksum = fnv1a32::Fnv32a::hash(cursor, start, end);
         let advertised_checksum = read_u32!(cursor);
         if checksum != advertised_checksum {
-            return ReadResult::Err(ReadError::new("Checksum error!"))
+            return ReadResult::Err(ReadError::new("Checksum error!"));
         }
         ReadResult::Ok
     }
@@ -85,7 +91,7 @@ pub enum Tlv {
     ObjectSkip(ObjectSkip),
     ObjectAck(ObjectAck),
     ErrorMessage(ErrorMessage),
-    ObjectAckRequest(ObjectAckRequest)
+    ObjectAckRequest(ObjectAckRequest),
 }
 
 #[derive(FromPrimitive, ToPrimitive, Debug, PartialEq)]
@@ -97,7 +103,7 @@ enum TlvType {
     ObjectSkip = 0x53,
     ObjectAck = 0x30,
     ErrorMessage = 0x31,
-    ObjectAckRequest = 0x32
+    ObjectAckRequest = 0x32,
 }
 
 impl WireFormat for Tlv {
@@ -109,7 +115,7 @@ impl WireFormat for Tlv {
             Tlv::ObjectSkip(x) => x.write(cursor),
             Tlv::ObjectAck(x) => x.write(cursor),
             Tlv::ErrorMessage(x) => x.write(cursor),
-            Tlv::ObjectAckRequest(x) => x.write(cursor)
+            Tlv::ObjectAckRequest(x) => x.write(cursor),
         }
     }
 
@@ -121,7 +127,7 @@ impl WireFormat for Tlv {
             Tlv::ObjectSkip(x) => x.read(cursor),
             Tlv::ObjectAck(x) => x.read(cursor),
             Tlv::ErrorMessage(x) => x.read(cursor),
-            Tlv::ObjectAckRequest(x) => x.read(cursor)
+            Tlv::ObjectAckRequest(x) => x.read(cursor),
         };
     }
 }
@@ -138,7 +144,9 @@ pub enum AckFreq {
 }
 
 impl Default for AckFreq {
-    fn default() -> Self {AckFreq::Default}
+    fn default() -> Self {
+        AckFreq::Default
+    }
 }
 
 #[derive(FromPrimitive, ToPrimitive, Debug, PartialEq, Clone)]
@@ -149,21 +157,25 @@ pub enum HostOs {
     MacOS = 3,
     FreeBSD = 4,
     Android = 5,
-    IOS = 6
+    IOS = 6,
 }
 
 impl Default for HostOs {
-    fn default() -> Self {HostOs::Linux}
+    fn default() -> Self {
+        HostOs::Linux
+    }
 }
 
 #[derive(FromPrimitive, ToPrimitive, Debug, PartialEq, Clone)]
 #[repr(u8)]
 pub enum ApplicationId {
-    SOFT = 1
+    SOFT = 1,
 }
 
 impl Default for ApplicationId {
-    fn default() -> Self {ApplicationId::SOFT}
+    fn default() -> Self {
+        ApplicationId::SOFT
+    }
 }
 
 #[derive(Default, Debug, PartialEq, Clone)]
@@ -173,7 +185,7 @@ pub struct HostInformation {
     pub ack_freq: AckFreq,
     pub os: HostOs,
     pub app: ApplicationId,
-    pub app_ver: Version
+    pub app_ver: Version,
 }
 
 impl WireFormat for HostInformation {
@@ -193,16 +205,16 @@ impl WireFormat for HostInformation {
             self.rcv_window_size = read_u128!(cursor);
             self.out_of_order_limit = read_u8!(cursor);
             self.ack_freq = match FromPrimitive::from_u8(read_u8!(cursor)) {
-               Some(x) => x,
-               None => AckFreq::Default
+                Some(x) => x,
+                None => AckFreq::Default,
             };
             self.os = match FromPrimitive::from_u8(read_u8!(cursor)) {
-               Some(x) => x,
-               None => HostOs::Linux
+                Some(x) => x,
+                None => HostOs::Linux,
             };
             self.app = match FromPrimitive::from_u8(read_u8!(cursor)) {
-               Some(x) => x,
-               None => return ReadResult::Err(ReadError::new("Unknown application."))
+                Some(x) => x,
+                None => return ReadResult::Err(ReadError::new("Unknown application.")),
             };
             self.app_ver = read_u8!(cursor);
         });
@@ -217,9 +229,9 @@ impl WireFormat for HostInformation {
 pub struct ObjectHeader {
     pub object_id: ObjectId,
     pub num_chunks: ChunkId, // LEB128
-    pub ack_req: bool, // Ack required
+    pub ack_req: bool,       // Ack required
     pub object_type: ObjectType,
-    pub fields: Vec<ObjectFieldDescription>
+    pub fields: Vec<ObjectFieldDescription>,
 }
 
 const HEADER_ACK_REQUEST_BITMASK: u8 = 0b1000_0000;
@@ -231,7 +243,7 @@ impl WireFormat for ObjectHeader {
             write_u128!(cursor, self.num_chunks as u64);
             match self.ack_req {
                 true => write_u8!(cursor, HEADER_ACK_REQUEST_BITMASK),
-                false => write_u8!(cursor, 0)
+                false => write_u8!(cursor, 0),
             };
             write_u8!(cursor, self.object_type);
             write_u8!(cursor, self.fields.len() as u8);
@@ -268,10 +280,10 @@ impl WireFormat for ObjectHeader {
 #[derive(Default, Debug, PartialEq)]
 pub struct ObjectFieldDescription {
     pub field_type: ObjectFieldType,
-    pub length: ChunkId // in nr. of chunks
+    pub length: ChunkId, // in nr. of chunks
 }
 
-impl WireFormat for ObjectFieldDescription{
+impl WireFormat for ObjectFieldDescription {
     fn write(&self, cursor: &mut Cursor) {
         write_u8!(cursor, self.field_type);
         write_u128!(cursor, self.length as u64);
@@ -294,22 +306,33 @@ pub struct ObjectChunk {
     pub more_chunks: bool,
     pub ack_required: bool,
     pub num_enclosed_msgs: u8,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
-const MORE_CHUNKS_BITMASK: u16       = 0b1000_0000_0000_0000;
+const MORE_CHUNKS_BITMASK: u16 = 0b1000_0000_0000_0000;
 const CHUNK_ACK_REQUEST_BITMASK: u16 = 0b0100_0000_0000_0000;
-const CHUNK_SIZE_BITMASK: u16        = 0b0000_0111_1111_1111;
+const CHUNK_SIZE_BITMASK: u16 = 0b0000_0111_1111_1111;
 
 impl WireFormat for ObjectChunk {
     fn write(&self, cursor: &mut Cursor) {
         write_tlv!(cursor, TlvType::ObjectChunk, {
             write_u64!(cursor, self.object_id);
             write_i128!(cursor, self.chunk_id);
-            write_u16!(cursor,
-                {if self.more_chunks {MORE_CHUNKS_BITMASK} else {0}} |
-                {if self.ack_required {CHUNK_ACK_REQUEST_BITMASK} else {0}} |
-                (self.data.len() + 1) as u16
+            write_u16!(
+                cursor,
+                {
+                    if self.more_chunks {
+                        MORE_CHUNKS_BITMASK
+                    } else {
+                        0
+                    }
+                } | {
+                    if self.ack_required {
+                        CHUNK_ACK_REQUEST_BITMASK
+                    } else {
+                        0
+                    }
+                } | (self.data.len() + 1) as u16
             );
             write_u8!(cursor, self.num_enclosed_msgs);
             cursor.write(&self.data).expect("Chunk data write failed!");
@@ -329,7 +352,7 @@ impl WireFormat for ObjectChunk {
             while chunksize > 0 {
                 match cursor.read_u8() {
                     Ok(byte) => self.data.push(byte),
-                    Err(err) => return ReadResult::Err(ReadError::new(&err.to_string()))
+                    Err(err) => return ReadResult::Err(ReadError::new(&err.to_string())),
                 }
                 chunksize -= 1;
             }
@@ -369,7 +392,7 @@ impl WireFormat for ObjectSkip {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct ObjectAck {
-    acknowledged_object_chunks: Vec<(ObjectId, ChunkId)>
+    acknowledged_object_chunks: Vec<(ObjectId, ChunkId)>,
 }
 
 impl WireFormat for ObjectAck {
@@ -388,9 +411,8 @@ impl WireFormat for ObjectAck {
             let num_acks = read_u8!(cursor);
             self.acknowledged_object_chunks.reserve(num_acks as usize);
             while num_acks > 0 {
-                self.acknowledged_object_chunks.push((
-                    read_u64!(cursor), read_i128!(cursor)
-                ));
+                self.acknowledged_object_chunks
+                    .push((read_u64!(cursor), read_i128!(cursor)));
             }
         });
         ReadResult::Ok
@@ -407,17 +429,19 @@ enum ErrorCode {
     ChecksumError = 4,
     UnsupportedVersion = 5,
     SessionUnknown = 6,
-    ObjectAbort = 8
+    ObjectAbort = 8,
 }
 
 impl Default for ErrorCode {
-    fn default() -> Self {ErrorCode::None}
+    fn default() -> Self {
+        ErrorCode::None
+    }
 }
 
 #[derive(Default, Debug, PartialEq)]
 pub struct MaxMinSupportedVersion {
     max_ver: Version,
-    min_ver: Version
+    min_ver: Version,
 }
 
 type AbortedObjectIds = Vec<ObjectId>;
@@ -426,17 +450,19 @@ type AbortedObjectIds = Vec<ObjectId>;
 enum ErrorData {
     UnsupportedVersion(MaxMinSupportedVersion),
     ObjectAbort(AbortedObjectIds),
-    None
+    None,
 }
 
 impl Default for ErrorData {
-    fn default() -> Self {ErrorData::None}
+    fn default() -> Self {
+        ErrorData::None
+    }
 }
 
 #[derive(Default, Debug, PartialEq)]
 pub struct ErrorMessage {
     code: ErrorCode,
-    detail: ErrorData
+    detail: ErrorData,
 }
 
 impl WireFormat for ErrorMessage {
@@ -463,9 +489,9 @@ impl WireFormat for ErrorMessage {
         read_tlv!(cursor, TlvType::ObjectChunk, {
             self.code = FromPrimitive::from_u8(read_u8!(cursor)).unwrap();
             self.detail = match &self.code {
-                UnsupportedVersion => ErrorData::UnsupportedVersion(MaxMinSupportedVersion{
+                UnsupportedVersion => ErrorData::UnsupportedVersion(MaxMinSupportedVersion {
                     max_ver: read_u8!(cursor),
-                    min_ver: read_u8!(cursor)
+                    min_ver: read_u8!(cursor),
                 }),
                 ObjectAbort => {
                     let mut result = Vec::new();
@@ -476,8 +502,8 @@ impl WireFormat for ErrorMessage {
                         num_aborted_object_ids -= 1;
                     }
                     ErrorData::ObjectAbort(result)
-                },
-                _ => ErrorData::None
+                }
+                _ => ErrorData::None,
             }
         });
         ReadResult::Ok
@@ -489,7 +515,7 @@ impl WireFormat for ErrorMessage {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct ObjectAckRequest {
-    req_ack_object_chunks: Vec<(ObjectId, ChunkId)>
+    req_ack_object_chunks: Vec<(ObjectId, ChunkId)>,
 }
 
 impl WireFormat for ObjectAckRequest {
@@ -508,10 +534,8 @@ impl WireFormat for ObjectAckRequest {
             let num_acks = read_u8!(cursor);
             self.req_ack_object_chunks.reserve(num_acks as usize);
             while num_acks > 0 {
-                self.req_ack_object_chunks.push((
-                    read_u64!(cursor),
-                    read_i128!(cursor)
-                ));
+                self.req_ack_object_chunks
+                    .push((read_u64!(cursor), read_i128!(cursor)));
             }
         });
         ReadResult::Ok

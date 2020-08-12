@@ -1,4 +1,3 @@
-
 use crate::transport::frame::*;
 
 pub const APP_VERSION: Version = 0;

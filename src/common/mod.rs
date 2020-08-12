@@ -1,14 +1,18 @@
 use std::error::Error;
-use std::io;
 use std::fmt;
+use std::io;
 pub use std::str::FromStr;
 
 /////////////////////////////////
 // Use third-party FNV hash
 
 pub mod fnv1a32;
-pub mod udp;
+
+/////////////////////////////////
+// Custom UdpSocket
+
 pub mod mtu;
+pub mod udp;
 
 /////////////////////////////////
 // Basic Types
@@ -20,12 +24,14 @@ pub type Cursor = io::Cursor<Vec<u8>>;
 
 #[derive(Debug)]
 pub struct ReadError {
-    what: String
+    what: String,
 }
 
 impl ReadError {
     pub fn new(msg: &str) -> ReadError {
-        ReadError {what: msg.to_string()}
+        ReadError {
+            what: msg.to_string(),
+        }
     }
 }
 
@@ -42,7 +48,8 @@ impl Error for ReadError {
 }
 
 pub enum ReadResult {
-    Ok, Err(ReadError)
+    Ok,
+    Err(ReadError),
 }
 
 /////////////////////////////////
@@ -60,7 +67,7 @@ macro_rules! read_u8 {
     ($cursor:ident) => {
         match $cursor.read_u8() {
             Ok(x) => x,
-            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string())),
         };
     };
 }
@@ -69,7 +76,7 @@ macro_rules! read_u16 {
     ($cursor:ident) => {
         match $cursor.read_u16::<NetworkEndian>() {
             Ok(x) => x,
-            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string())),
         };
     };
 }
@@ -78,7 +85,7 @@ macro_rules! read_u32 {
     ($cursor:ident) => {
         match $cursor.read_u32::<NetworkEndian>() {
             Ok(x) => x,
-            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string())),
         };
     };
 }
@@ -87,7 +94,7 @@ macro_rules! read_u64 {
     ($cursor:ident) => {
         match $cursor.read_u64::<NetworkEndian>() {
             Ok(x) => x,
-            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string())),
         };
     };
 }
@@ -96,7 +103,7 @@ macro_rules! read_u128 {
     ($cursor:ident) => {
         match leb128::read::unsigned($cursor) {
             Ok(x) => x,
-            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string())),
         };
     };
 }
@@ -105,7 +112,7 @@ macro_rules! read_i128 {
     ($cursor:ident) => {
         match leb128::read::signed($cursor) {
             Ok(x) => x,
-            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string()))
+            Err(e) => return ReadResult::Err(ReadError::new(&e.to_string())),
         };
     };
 }
@@ -135,7 +142,7 @@ macro_rules! read_str {
         }
         match String::from_utf8(buf) {
             Ok(val) => val,
-            _ => return ReadResult::Err(ReadError::new(""))
+            _ => return ReadResult::Err(ReadError::new("")),
         }
     }};
 }
@@ -151,19 +158,25 @@ macro_rules! write_u8 {
 
 macro_rules! write_u16 {
     ($cursor:ident, $value:expr) => {
-        $cursor.write_u16::<NetworkEndian>($value).expect("write_u16: Failed.")
+        $cursor
+            .write_u16::<NetworkEndian>($value)
+            .expect("write_u16: Failed.")
     };
 }
 
 macro_rules! write_u32 {
     ($cursor:ident, $value:expr) => {
-        $cursor.write_u32::<NetworkEndian>($value).expect("write_u32: Failed.")
+        $cursor
+            .write_u32::<NetworkEndian>($value)
+            .expect("write_u32: Failed.")
     };
 }
 
 macro_rules! write_u64 {
     ($cursor:ident, $value:expr) => {
-        $cursor.write_u64::<NetworkEndian>($value).expect("write_u64: Failed.")
+        $cursor
+            .write_u64::<NetworkEndian>($value)
+            .expect("write_u64: Failed.")
     };
 }
 

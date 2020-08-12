@@ -10,13 +10,13 @@ extern crate digest;
 extern crate generic_array;
 
 use crate::common::Cursor;
-use std::io::{Read, Write, Seek};
-use byteorder::{ReadBytesExt};
+use byteorder::ReadBytesExt;
 use core::hash::Hasher;
 #[cfg(feature = "generic")]
 use digest;
 #[cfg(feature = "generic")]
 use generic_array;
+use std::io::{Read, Seek, Write};
 
 const FNV_OFFSET: u32 = 0x811C9DC5;
 const FNV_PRIME: u32 = 0x01000193;
@@ -67,11 +67,10 @@ pub struct Fnv32a {
 }
 
 impl Fnv32a {
-
     /// return 32bit FNV1a hash of `cursor` between `from` until excluding `to`
     pub fn hash(cursor: &mut Cursor, from: u64, to: u64) -> u32 {
         let pos = cursor.position();
-        
+
         let mut hasher = Fnv32a::default();
         let mut byte: [u8; 1] = [0];
         cursor.set_position(from);
@@ -79,23 +78,21 @@ impl Fnv32a {
             cursor.read_exact(&mut byte);
             hasher.write(&byte);
         }
-        
+
         cursor.set_position(pos);
         return hasher.finish() as u32;
     }
 
     #[inline]
     fn write_u8(&mut self, byte: u8) {
-            self.state ^= byte as u32;
-            self.state = self.state.wrapping_mul(FNV_PRIME);
+        self.state ^= byte as u32;
+        self.state = self.state.wrapping_mul(FNV_PRIME);
     }
 }
 
 impl Default for Fnv32a {
     fn default() -> Self {
-        Fnv32a {
-            state: FNV_OFFSET,
-        }
+        Fnv32a { state: FNV_OFFSET }
     }
 }
 
@@ -106,7 +103,7 @@ impl Hasher for Fnv32a {
             self.write_u8(byte);
         }
     }
-    
+
     // actually u32
     #[inline]
     fn finish(&self) -> u64 {
@@ -127,7 +124,7 @@ mod test {
         println!("hash({:x?})", b);
         let r = hasher.finish();
         println!("Should: {:x}; Is: {:x}", a, r);
-        assert_eq!(r, a as u64) 
+        assert_eq!(r, a as u64)
     }
 
     #[test]
@@ -139,4 +136,3 @@ mod test {
         test(0xe35a21cb, b"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Pharetra sit amet aliquam id. Tortor at risus viverra adipiscing at in. Risus nec feugiat in fermentum posuere urna nec tincidunt praesent. Viverra accumsan in nisl nisi scelerisque eu ultrices vitae auctor. Blandit massa enim nec dui nunc mattis enim ut tellus. Eros in cursus turpis massa tincidunt. Nulla aliquet enim tortor at auctor. Purus semper eget duis at tellus at urna condimentum. Vitae suscipit tellus mauris a diam maecenas sed enim. Massa enim nec dui nunc mattis. Diam vel quam elementum pulvinar etiam non quam lacus suspendisse. Elementum nisi quis eleifend quam. Lacus vestibulum sed arcu non odio. Diam maecenas sed enim ut sem. Est sit amet facilisis magna etiam tempor. Tristique senectus et netus et malesuada fames ac.");
     }
 }
-

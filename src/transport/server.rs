@@ -1,8 +1,8 @@
-use std::net::{SocketAddr, UdpSocket};
+use crate::transport::common::default_host_info;
 use crate::transport::connection::*;
 use crate::transport::frame::*;
-use crate::transport::common::default_host_info;
 use log;
+use std::net::{SocketAddr, UdpSocket};
 
 pub struct Listener {
     socket: UdpSocket,
@@ -12,12 +12,18 @@ impl Listener {
     pub fn new(bind: SocketAddr) -> Self {
         let socket: UdpSocket = UdpSocket::bind(bind).expect("Could not bind to Socket.");
         socket.set_nonblocking(true).unwrap();
-        Self {socket: Some(socket)}
+        Self {
+            socket: Some(socket),
+        }
     }
 
     /// Used by servers to listen for incoming connections.
     /// non-blocking.
-    pub fn listen_once(&mut self, accept_callback: Box<ObjectListener>, timeout_callback: Box<TimeoutListener>) -> Option<Connection> {
+    pub fn listen_once(
+        &mut self,
+        accept_callback: Box<ObjectListener>,
+        timeout_callback: Box<TimeoutListener>,
+    ) -> Option<Connection> {
         // try to consume the socket to transfer its ownership to Connection
         if let Some(socket) = &mut self.socket {
             let mut buf: [u8; 10] = [0; 10];

@@ -1,21 +1,21 @@
-use crate::options::Options;
-use log::info;
-use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::env::current_dir;
 use super::state::*;
+use crate::options::Options;
 use crate::transport::server;
 use crate::transport::server::Listener;
+use log::info;
+use std::cell::RefCell;
+use std::env::current_dir;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::rc::Rc;
 
 /// Run server on current working directory
-pub fn run(opt: Options) -> std::result::Result<(), ()>
-{
+pub fn run(opt: Options) -> std::result::Result<(), ()> {
     //////////////////////////////
     // Server client startup.
     let mut s = format!(
         "File server started with {}, working directory {}",
-        opt, current_dir().unwrap().display()
+        opt,
+        current_dir().unwrap().display()
     );
 
     //////////////////////////////
@@ -24,16 +24,14 @@ pub fn run(opt: Options) -> std::result::Result<(), ()>
 
     //////////////////////////////
     // Create server for listening
-    let mut server = Listener::new(
-        SocketAddr::V4(
-            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), opt.port)
-        )
-    );
+    let mut server = Listener::new(SocketAddr::V4(SocketAddrV4::new(
+        Ipv4Addr::new(0, 0, 0, 0),
+        opt.port,
+    )));
 
     //////////////////////////////
     // Wait until reception is done.
-    while !state_machine.borrow().is_finished()
-    {
+    while !state_machine.borrow().is_finished() {
         ///////////////////////////////////
         // Create potential event handlers.
         let incoming_object_handler = Box::new(move |recv_job| {});
@@ -46,11 +44,10 @@ pub fn run(opt: Options) -> std::result::Result<(), ()>
         // Listen for connection
         let mut connection = match server.listen_once(incoming_object_handler, timeout_handler) {
             Some(connection) => connection,
-            None => continue
+            None => continue,
         };
 
-        while !state_machine.borrow().is_finished()
-        {
+        while !state_machine.borrow().is_finished() {
             connection.receive_and_send();
 
             ///////////////////////////////////
@@ -66,7 +63,7 @@ pub fn run(opt: Options) -> std::result::Result<(), ()>
             loop {
                 match state_machine.borrow_mut().pop_new_send_job() {
                     Some(job) => connection.send_jobs.push(job),
-                    None => break
+                    None => break,
                 }
             }
         }

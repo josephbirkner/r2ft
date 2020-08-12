@@ -1,12 +1,11 @@
-use crate::common::{WireFormat, Cursor, ReadResult};
+use crate::common::{Cursor, ReadResult, WireFormat};
 use crate::transport::frame::*;
 use itertools::Itertools;
 use std::fs::File;
 use std::io::{Seek, SeekFrom};
 
 #[test]
-fn test_serialize_message_frame()
-{
+fn test_serialize_message_frame() {
     // Structure to serialize
     let message_frame = MessageFrame {
         version: 1,
@@ -17,40 +16,39 @@ fn test_serialize_message_frame()
                 num_chunks: 2,
                 ack_req: true,
                 object_type: 42,
-                fields: vec![
-                    ObjectFieldDescription{
-                        field_type: 66,
-                        length: 6
-                    }
-                ]
+                fields: vec![ObjectFieldDescription {
+                    field_type: 66,
+                    length: 6,
+                }],
             }),
             Tlv::ObjectHeader(ObjectHeader {
                 object_id: 1,
                 num_chunks: 2,
                 ack_req: true,
                 object_type: 42,
-                fields: vec![
-                    ObjectFieldDescription{
-                        field_type: 66,
-                        length: 6
-                    }
-                ]
+                fields: vec![ObjectFieldDescription {
+                    field_type: 66,
+                    length: 6,
+                }],
             }),
-        ]
+        ],
     };
 
     // Serialize it!
     let mut buffer = Vec::new();
     let mut cursor = Cursor::new(buffer);
     message_frame.write(&mut cursor);
-    println!("Encoded message frame: {:02x}", cursor.get_ref().iter().format(" "));
+    println!(
+        "Encoded message frame: {:02x}",
+        cursor.get_ref().iter().format(" ")
+    );
 
     // Deserialize it!
     cursor.seek(SeekFrom::Start(0)).unwrap();
     let mut parsed_message_frame = MessageFrame::default();
     match parsed_message_frame.read(&mut cursor) {
         ReadResult::Err(x) => println!("Error: {}", &x.to_string()),
-        _ => {},
+        _ => {}
     }
 
     // Compare ...
@@ -71,7 +69,7 @@ fn test_serialize_message_frame()
                     assert_eq!(l.fields[field_id].field_type, r.fields[field_id].field_type);
                     assert_eq!(l.fields[field_id].length, r.fields[field_id].length);
                 }
-            },
+            }
             (_, _) => {}
         }
     }

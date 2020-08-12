@@ -1,14 +1,14 @@
-use crate::transport::jobs::*;
-use std::net::{SocketAddr, UdpSocket};
-use crate::common::udp::{Socket, Packet};
-use std::rc::Rc;
 use super::frame::*;
-use crate::common::{Cursor, WireFormat, ReadResult};
+use crate::common::udp::{Packet, Socket};
+use crate::common::{Cursor, ReadResult, WireFormat};
+use crate::transport::client::connect;
+use crate::transport::common::*;
+use crate::transport::jobs::*;
 use log;
 use rand::{thread_rng, Rng};
-use crate::transport::common::*;
 use std::iter::Iterator;
-use crate::transport::client::connect;
+use std::net::{SocketAddr, UdpSocket};
+use std::rc::Rc;
 
 //////////////////////////
 // Connection
@@ -17,11 +17,11 @@ use crate::transport::client::connect;
 /// about new receiving Objects.
 /// The application returns None, if it is not interested in the Object.
 /// Otherwise the application returns its ChunkListener for that Object.
-pub type ObjectListener = dyn FnMut (ObjectReceiveJob) -> ();
+pub type ObjectListener = dyn FnMut(ObjectReceiveJob) -> ();
 
 /// Will be called by the transport layer to inform the application
 /// about a timeout of a connection.
-pub type TimeoutListener = dyn FnMut () -> ();
+pub type TimeoutListener = dyn FnMut() -> ();
 
 /// Constructors for `Connection` are found in `super::{client, server}`.
 pub struct Connection {
@@ -49,12 +49,11 @@ pub struct Connection {
     pub(super) session: Option<EstablishedState>,
 }
 
-impl Connection{
+impl Connection {
     /// Should return within about 0.1s to allow the application to interact
     /// with the user still.
     /// Must be called by the application in its main loop.
-    pub fn receive_and_send(&mut self)
-    {
+    pub fn receive_and_send(&mut self) {
         for i in 0..self.send_jobs.len() {
             self.send_once(i);
         }
@@ -88,14 +87,19 @@ impl Connection{
                 ReadResult::Err(x) => {
                     log::error!("Error: {}", &x.to_string());
                     return;
-                },
-                _ => {},
+                }
+                _ => {}
             }
         } else {
             // no packets received
             return;
         }
-        log::trace!("Received: proto version {}, sid {}, n_tlvs {}", message_frame.version, message_frame.sid, message_frame.tlvs.len());
+        log::trace!(
+            "Received: proto version {}, sid {}, n_tlvs {}",
+            message_frame.version,
+            message_frame.sid,
+            message_frame.tlvs.len()
+        );
 
         // check protocol version
         if message_frame.version != PROTOCOL_VERSION {
@@ -120,29 +124,25 @@ impl Connection{
                 } else {
                     self.session = Some(EstablishedState::be_gentle(message_frame.sid));
                 }
-            },
+            }
             (None, _) => {
                 log::debug!("This is not the HostInformation tlv we are waiting for. It must be the first TLV in a message.");
                 return;
-            },
+            }
             (_, Tlv::ObjectHeader(oh)) => {
-                self.recv_jobs.push(ObjectReceiveJob{
-                    chunk_received_callback: Box::new(|_, _, _|{}),
+                self.recv_jobs.push(ObjectReceiveJob {
+                    chunk_received_callback: Box::new(|_, _, _| {}),
                     object: Object {
                         object_type: oh.object_type,
                         object_id: oh.object_id,
                         fields: oh.fields,
-                        transmission_finished_callback: Box::new(||{})
+                        transmission_finished_callback: Box::new(|| {}),
                     },
-                    abort: false
+                    abort: false,
                 });
-            },
-            (_, Tlv::ObjectChunk(oh)) => {
-                unimplemented!()
-            },
-            (_, _) => {
-                unimplemented!()
             }
+            (_, Tlv::ObjectChunk(oh)) => unimplemented!(),
+            (_, _) => unimplemented!(),
         }
         // if is_server: we have received and send HostInfos.
         // if !is_server: we have sent and received HostInfos.
@@ -151,7 +151,10 @@ impl Connection{
         //let peer_info: HostInformation = self.peer_info.unwrap();
         //let session: EstablishedState = self.session.unwrap();
 
-        log::info!("Session (id: {}) established.", self.session.as_ref().unwrap().sessionid);
+        log::info!(
+            "Session (id: {}) established.",
+            self.session.as_ref().unwrap().sessionid
+        );
     }
 
     /// must be called before anything is sent.
@@ -162,12 +165,14 @@ impl Connection{
         frame.version = PROTOCOL_VERSION;
         if self.is_server {
             // set random session id
-            frame.sid = thread_rng().gen_range(1, 2^64);
+            frame.sid = thread_rng().gen_range(1, 2 ^ 64);
         } else {
             // we are a client
             frame.sid = 0;
         }
-        frame.tlvs.insert(0, Tlv::HostInformation(self.self_info.clone()));
+        frame
+            .tlvs
+            .insert(0, Tlv::HostInformation(self.self_info.clone()));
 
         // serialize and send frame
         let mut cursor = Cursor::new(Vec::new());
@@ -188,9 +193,7 @@ impl EstablishedState {
     /// returns a state that ensures the connection will be as gentle as
     /// possible to its peer.
     fn be_gentle(sessionid: SessionId) -> Self {
-        Self {
-            sessionid,
-        }
+        Self { sessionid }
     }
 }
 
@@ -200,31 +203,28 @@ mod test {
         use env_logger;
         env_logger::init();
         use crate::transport::client;
-        use crate::transport::server;
         use crate::transport::connection::*;
-        use std::time::Duration;
+        use crate::transport::server;
         use std::thread;
+        use std::time::Duration;
 
         let mut connection_listener = server::Listener::new("0.0.0.0:8080".parse().unwrap());
-        let mut server_conn: Option<Connection> = connection_listener.listen_once(
-            Box::new(|a|{}),
-            Box::new(||{}));
+        let mut server_conn: Option<Connection> =
+            connection_listener.listen_once(Box::new(|a| {}), Box::new(|| {}));
         assert_eq!(server_conn.is_none(), true);
 
         let mut client_conn = client::connect(
             "127.0.0.1:8080".parse().unwrap(),
-            Box::new(|a|{}),
-            Box::new(||{}),
-            );
+            Box::new(|a| {}),
+            Box::new(|| {}),
+        );
         thread::sleep(Duration::from_secs_f32(0.1));
-       
+
         client_conn.receive_and_send();
         // initialized, but not complete yet
         assert_eq!(client_conn.session.as_ref().unwrap().sessionid, 0);
 
-        server_conn = connection_listener.listen_once(
-            Box::new(|a|{}),
-            Box::new(||{}));
+        server_conn = connection_listener.listen_once(Box::new(|a| {}), Box::new(|| {}));
         assert_eq!(server_conn.is_some(), true);
 
         client_conn.receive_and_send();

@@ -1,14 +1,13 @@
-use crate::options::Options;
-use log::info;
-use std::net::SocketAddr;
-use std::cell::RefCell;
-use std::rc::Rc;
 use super::state::*;
+use crate::options::Options;
 use crate::transport::client;
+use log::info;
+use std::cell::RefCell;
+use std::net::SocketAddr;
+use std::rc::Rc;
 
 /// Run client for file retrieval.
-pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::result::Result<(), ()>
-{
+pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::result::Result<(), ()> {
     //////////////////////////////
     // Announce client startup.
     let mut s = format!(
@@ -34,11 +33,7 @@ pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::resu
 
     //////////////////////////////
     // Create connection.
-    let mut connection = client::connect(
-        socket_addr,
-        incoming_object_handler,
-        timeout_handler,
-    );
+    let mut connection = client::connect(socket_addr, incoming_object_handler, timeout_handler);
     state_machine.borrow_mut().connected();
 
     //////////////////////////////
@@ -47,12 +42,13 @@ pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::resu
     for path in files {
         files_copy.push(String::from(path));
     }
-    connection.send_jobs.push(state_machine.borrow_mut().push_file_request_job(files_copy));
+    connection
+        .send_jobs
+        .push(state_machine.borrow_mut().push_file_request_job(files_copy));
 
     //////////////////////////////
     // Wait until reception is done.
-    while !state_machine.borrow().is_finished()
-    {
+    while !state_machine.borrow().is_finished() {
         connection.receive_and_send();
 
         ///////////////////////////////////
@@ -68,7 +64,7 @@ pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::resu
         loop {
             match state_machine.borrow_mut().pop_new_send_job() {
                 Some(job) => connection.send_jobs.push(job),
-                None => break
+                None => break,
             }
         }
 

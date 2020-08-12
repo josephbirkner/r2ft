@@ -1,9 +1,9 @@
-use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
-use std::io::{Seek, SeekFrom, Write, Read};
-use leb128;
 use crate::common::fnv1a32;
 use crate::common::*;
+use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
+use leb128;
 use num::{FromPrimitive, ToPrimitive};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 /////////////////////////////////
 // Basic Types/Functions
@@ -12,12 +12,14 @@ type FileId = u64;
 
 pub enum AppTlvParseResult {
     Ok(AppTlv),
-    Err(ReadError)
+    Err(ReadError),
 }
 
 pub fn parse(cursor: &mut Cursor) -> AppTlvParseResult {
     let app_tlv_type = cursor.read_u8().unwrap();
-    cursor.seek(SeekFrom::Current(-1)).expect("Seek back (2) failed."); // TLV will read type again.
+    cursor
+        .seek(SeekFrom::Current(-1))
+        .expect("Seek back (2) failed."); // TLV will read type again.
     let mut app_tlv = match FromPrimitive::from_u8(app_tlv_type) {
         Some(AppTlvType::FileRequest) => AppTlv::FileRequest(FileRequest::default()),
         Some(AppTlvType::FileResume) => AppTlv::FileResume(FileResume::default()),
@@ -26,13 +28,15 @@ pub fn parse(cursor: &mut Cursor) -> AppTlvParseResult {
         Some(AppTlvType::ApplicationError) => AppTlv::ApplicationError(ApplicationError::default()),
         Some(AppTlvType::FileListRequest) => AppTlv::FileListRequest(FileListRequest::default()),
         Some(AppTlvType::FileListResponse) => AppTlv::FileListResponse(FileListResponse::default()),
-        None => return AppTlvParseResult::Err(
-            ReadError::new(
-                format!("Unknown application message type code {}!", app_tlv_type).as_str())),
+        None => {
+            return AppTlvParseResult::Err(ReadError::new(
+                format!("Unknown application message type code {}!", app_tlv_type).as_str(),
+            ))
+        }
     };
     match app_tlv.read(cursor) {
         ReadResult::Ok => AppTlvParseResult::Ok(app_tlv),
-        ReadResult::Err(e) => AppTlvParseResult::Err(e)
+        ReadResult::Err(e) => AppTlvParseResult::Err(e),
     }
 }
 
@@ -58,7 +62,7 @@ pub enum AppObjectFieldType {
     FileResponseContent = 0x23,
     ErrorReportContent = 0x24,
     FileListRequestContent = 0x25,
-    FileListResponseContent = 0x26
+    FileListResponseContent = 0x26,
 }
 
 /////////////////////////////////
@@ -96,7 +100,7 @@ impl WireFormat for AppTlv {
             AppTlv::FileContent(x) => x.write(cursor),
             AppTlv::ApplicationError(x) => x.write(cursor),
             AppTlv::FileListRequest(x) => x.write(cursor),
-            AppTlv::FileListResponse(x) => x.write(cursor)
+            AppTlv::FileListResponse(x) => x.write(cursor),
         }
     }
 
@@ -108,8 +112,8 @@ impl WireFormat for AppTlv {
             AppTlv::FileContent(x) => x.read(cursor),
             AppTlv::ApplicationError(x) => x.read(cursor),
             AppTlv::FileListRequest(x) => x.read(cursor),
-            AppTlv::FileListResponse(x) => x.read(cursor)
-        }
+            AppTlv::FileListResponse(x) => x.read(cursor),
+        };
     }
 }
 
@@ -166,10 +170,8 @@ impl WireFormat for FileResume {
         read_tlv!(cursor, AppTlvType::FileRequest, {
             let mut num_pairs = read_u8!(cursor);
             while num_pairs > 0 {
-                self.file_ids_and_chunk_ids.push((
-                    read_u64!(cursor),
-                    read_i128!(cursor)
-                ));
+                self.file_ids_and_chunk_ids
+                    .push((read_u64!(cursor), read_i128!(cursor)));
                 num_pairs -= 1;
             }
         });
@@ -199,7 +201,9 @@ pub enum MetadataEntryType {
 }
 
 impl Default for MetadataEntryType {
-    fn default() -> MetadataEntryType {MetadataEntryType::None}
+    fn default() -> MetadataEntryType {
+        MetadataEntryType::None
+    }
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -229,10 +233,10 @@ impl WireFormat for FileMetadata {
         read_tlv!(cursor, AppTlvType::FileMetadata, {
             let mut num_entries = read_u8!(cursor);
             while num_entries > 0 {
-                self.metadata_entries.push(MetadataEntry{
+                self.metadata_entries.push(MetadataEntry {
                     code: match FromPrimitive::from_u8(read_u8!(cursor)) {
                         Some(x) => x,
-                        None => MetadataEntryType::None
+                        None => MetadataEntryType::None,
                     },
                     content: {
                         let mut buf = Vec::new();
@@ -242,7 +246,7 @@ impl WireFormat for FileMetadata {
                             num_bytes -= 1;
                         }
                         buf
-                    }
+                    },
                 });
                 num_entries -= 1;
             }
@@ -268,7 +272,9 @@ impl WireFormat for FileContent {
 
     fn read(&mut self, cursor: &mut Cursor) -> ReadResult {
         read_tlv!(cursor, AppTlvType::FileContent, {
-            cursor.seek(SeekFrom::Current(-2)).expect("Seek back (3) failed.");
+            cursor
+                .seek(SeekFrom::Current(-2))
+                .expect("Seek back (3) failed.");
             let mut num_bytes = read_u16!(cursor);
             while num_bytes > 0 {
                 self.content.push(read_u8!(cursor));
@@ -297,7 +303,9 @@ pub enum AppErrorCode {
 }
 
 impl Default for AppErrorCode {
-    fn default() -> AppErrorCode {AppErrorCode::None}
+    fn default() -> AppErrorCode {
+        AppErrorCode::None
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -308,7 +316,9 @@ pub enum AppErrorData {
 }
 
 impl Default for AppErrorData {
-    fn default() -> AppErrorData {AppErrorData::Empty}
+    fn default() -> AppErrorData {
+        AppErrorData::Empty
+    }
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -325,23 +335,22 @@ impl WireFormat for ApplicationError {
                 (AppErrorCode::InvalidDepthForList, AppErrorData::Paths(paths)) => {
                     assert!(paths.len() > 0);
                     write_str!(cursor, paths[0]);
-                },
-                (AppErrorCode::FileNotFound, AppErrorData::Paths(paths)) |
-                (AppErrorCode::FileChanged, AppErrorData::Paths(paths)) |
-                (AppErrorCode::FileHashError, AppErrorData::Paths(paths)) |
-                (AppErrorCode::FileAbort, AppErrorData::Paths(paths))
-                 => {
+                }
+                (AppErrorCode::FileNotFound, AppErrorData::Paths(paths))
+                | (AppErrorCode::FileChanged, AppErrorData::Paths(paths))
+                | (AppErrorCode::FileHashError, AppErrorData::Paths(paths))
+                | (AppErrorCode::FileAbort, AppErrorData::Paths(paths)) => {
                     write_u8!(cursor, paths.len() as u8);
                     for path in paths {
                         write_str!(cursor, path);
                     }
-                },
+                }
                 (AppErrorCode::UnknownFormatCode, AppErrorData::FormatCodes(codes)) => {
                     write_u8!(cursor, codes.len() as u8);
                     for code in codes {
                         write_u8!(cursor, *code);
                     }
-                },
+                }
                 (_, _) => {}
             };
         });
@@ -351,17 +360,14 @@ impl WireFormat for ApplicationError {
         read_tlv!(cursor, AppTlvType::ApplicationError, {
             self.error_code = match FromPrimitive::from_u8(read_u8!(cursor)) {
                 Some(x) => x,
-                None => AppErrorCode::None
+                None => AppErrorCode::None,
             };
             self.error_data = match self.error_code {
-                AppErrorCode::InvalidDepthForList => AppErrorData::Paths(
-                    vec![read_str!(cursor)]
-                ),
-                AppErrorCode::FileNotFound |
-                AppErrorCode::FileChanged |
-                AppErrorCode::FileHashError |
-                AppErrorCode::FileAbort
-                 => AppErrorData::Paths({
+                AppErrorCode::InvalidDepthForList => AppErrorData::Paths(vec![read_str!(cursor)]),
+                AppErrorCode::FileNotFound
+                | AppErrorCode::FileChanged
+                | AppErrorCode::FileHashError
+                | AppErrorCode::FileAbort => AppErrorData::Paths({
                     let mut num_paths = read_u8!(cursor);
                     let mut paths = Vec::new();
                     while num_paths > 0 {
@@ -379,7 +385,7 @@ impl WireFormat for ApplicationError {
                     }
                     codes
                 }),
-                _ => AppErrorData::Empty
+                _ => AppErrorData::Empty,
             }
         });
         ReadResult::Ok
@@ -429,11 +435,13 @@ pub struct FileListResponse {
 #[repr(u8)]
 pub enum FileListEntryType {
     File = 0x00,
-    Dir = 0x01
+    Dir = 0x01,
 }
 
 impl Default for FileListEntryType {
-    fn default() -> Self {FileListEntryType::File}
+    fn default() -> Self {
+        FileListEntryType::File
+    }
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -441,7 +449,7 @@ pub struct FileListEntry {
     pub entry_type: FileListEntryType,
     pub parent: FileId,
     pub name: String,
-    pub id: FileId
+    pub id: FileId,
 }
 
 impl WireFormat for FileListResponse {
@@ -461,10 +469,10 @@ impl WireFormat for FileListResponse {
         read_tlv!(cursor, AppTlvType::FileListResponse, {
             let mut num_entries = read_u8!(cursor);
             while num_entries > 0 {
-                self.file_list_entries.push(FileListEntry{
+                self.file_list_entries.push(FileListEntry {
                     entry_type: match FromPrimitive::from_u8(read_u8!(cursor)) {
                         Some(x) => x,
-                        None => FileListEntryType::File
+                        None => FileListEntryType::File,
                     },
                     parent: read_u64!(cursor),
                     name: read_str!(cursor),
