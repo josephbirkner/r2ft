@@ -5,6 +5,7 @@ use crate::transport::client;
 use crate::transport::jobs::*;
 use crate::transport::frame::*;
 
+use std::fs;
 use std::collections::{HashMap, HashSet};
 use log::info;
 use log::error;
@@ -13,6 +14,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use itertools::Chunk;
 use num::{FromPrimitive, ToPrimitive};
+use std::process::exit;
+use std::ops::DerefMut;
 
 #[derive(PartialEq, Eq)]
 enum State {
@@ -21,17 +24,41 @@ enum State {
     Finished,
 }
 
-enum ObjectTransferState {
-    File {
+struct FileReceiveState {
+    device: Option<fs::File>,
+    missing_chunks: HashSet<ChunkId>,
+    all_received_until: ChunkId
+}
 
-    },
+impl FileReceiveState {
+    fn notify_metadata(&mut self, metadata: &FileMetadata) {
+        todo!();
+    }
+
+    fn notify_content(&mut self, content: &FileContent) {
+        todo!();
+    }
+}
+
+enum ObjectTransferState {
+    File(FileReceiveState),
+}
+
+impl Default for ObjectTransferState {
+    fn default() -> Self {
+        ObjectTransferState::File(FileReceiveState{
+            device: None,
+            missing_chunks: HashSet::new(),
+            all_received_until: -1
+        })
+    }
 }
 
 struct StateMachine {
     state: State,
     next_object_id: ObjectId,
     expected_files: Vec<String>,
-    receiving_objects: HashSet<(ObjectType, ObjectId)> // HashMap<(ObjectType, ObjectId), ObjectTransferState>
+    recv_state: HashMap<(ObjectType, ObjectId), RefCell<ObjectTransferState>>
 }
 
 impl StateMachine {
@@ -40,7 +67,7 @@ impl StateMachine {
             state: State::Startup,
             next_object_id: 0,
             expected_files: vec![],
-            receiving_objects: HashSet::new()
+            recv_state: HashMap::new()
         }
     }
 
@@ -59,6 +86,11 @@ impl StateMachine {
 
     fn is_finished(&self) -> bool {
         self.state == State::Finished
+    }
+
+    fn all_files_received(&self) -> bool {
+        todo!();
+        return false;
     }
 
     fn file_request_job(&mut self, files: Vec<String>) -> ObjectSendJob {
@@ -87,42 +119,57 @@ impl StateMachine {
     }
 
     fn is_recv_job_registered(&self, recv_job: &ObjectReceiveJob) -> bool {
-        self.receiving_objects.contains(
+        self.recv_state.contains_key(
             &(recv_job.object.object_type, recv_job.object.object_id))
     }
 
-    fn register_recv_job(&mut self, recv_job: &mut ObjectReceiveJob) {
+    fn register_recv_job(state_machine: &Rc<RefCell<StateMachine>>, recv_job: &mut ObjectReceiveJob)
+    {
         let object_info = (recv_job.object.object_type, recv_job.object.object_id);
         let mut object_fields = Vec::new();
         for field in &recv_job.object.fields {
             object_fields.push(field.clone());
         }
-        self.receiving_objects.insert(object_info.clone());
-        recv_job.chunk_received_callback = Box::new(move |data: Vec<u8>, chunk_id: ChunkId, num_tlv: u8| {
-            log::info!("Received chunk #{} for object #{}, {} tlvs.", chunk_id, object_info.1, num_tlv);
-            let mut tlv_idx = 0;
-            let tlv = match parse(&mut Cursor::new(data)) {
-                AppTlvParseResult::Ok(tlv) => tlv,
-                AppTlvParseResult::Err(e) => {
-                    log::error!(" Error: {}", e);
-                    return
-                }
-            };
-            match tlv {
-                AppTlv::FileMetadata(metadata_tlv) => {
-
-                },
-                AppTlv::FileContent(content_tlv) => {
-
-                },
-                AppTlv::ApplicationError(err_tlv) => {
-
-                },
-                _ => {
-                    log::error!(" Encountered unexpected TLV type.");
+        state_machine.borrow_mut().recv_state.insert(object_info.clone(), RefCell::new(ObjectTransferState::default()));
+        let state_machine_ref = Rc::clone(state_machine);
+        recv_job.chunk_received_callback = Box::new(
+            move |data: Vec<u8>, chunk_id: ChunkId, num_tlv: u8|
+            {
+                let state_machine = state_machine_ref.borrow_mut();
+                let mut cursor = Cursor::new(data);
+                log::info!("Received chunk #{} for object #{}, {} tlvs.", chunk_id, object_info.1, num_tlv);
+                let mut tlv_idx = 0;
+                while tlv_idx < num_tlv
+                {
+                    log::info!("Parsing TLV #{} ...", tlv_idx);
+                    let tlv = match parse(&mut cursor) {
+                        AppTlvParseResult::Ok(tlv) => tlv,
+                        AppTlvParseResult::Err(e) => {
+                            log::error!(" Error: {}", e);
+                            return
+                        }
+                    };
+                    let obj_state = state_machine.recv_state.get(&object_info).unwrap();
+                    match (&tlv, obj_state.borrow_mut().deref_mut()) {
+                        (AppTlv::FileMetadata(metadata_tlv), ObjectTransferState::File(f)) => {
+                            f.notify_metadata(metadata_tlv);
+                        },
+                        (AppTlv::FileContent(content_tlv), ObjectTransferState::File(f)) => {
+                            f.notify_content(content_tlv);
+                        },
+                        (AppTlv::ApplicationError(err_tlv), _) => {
+                            log::error!(" Received server error (code {})", err_tlv.error_code.to_u8().unwrap());
+                            state_machine_ref.borrow_mut().finished();
+                        },
+                        _ => {
+                            log::error!(" Encountered unexpected TLV type.");
+                            state_machine_ref.borrow_mut().finished();
+                        }
+                    }
+                    tlv_idx += 1;
                 }
             }
-        });
+        );
     }
 }
 
@@ -171,12 +218,18 @@ pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::resu
 
     //////////////////////////////
     // Wait until reception is done.
-    while !state_machine.borrow().is_finished() {
+    while !state_machine.borrow().is_finished()
+    {
         connection.receive_and_send();
+
         for recv_job in &mut connection.recv_jobs {
             if !state_machine.borrow().is_recv_job_registered(recv_job) {
-                state_machine.borrow_mut().register_recv_job(recv_job);
+                StateMachine::register_recv_job(&state_machine, recv_job);
             }
+        }
+
+        if state_machine.borrow().all_files_received() {
+            state_machine.borrow_mut().finished();
         }
     }
 
