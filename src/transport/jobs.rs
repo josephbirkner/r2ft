@@ -64,10 +64,10 @@ impl ObjectSendJob {
 /// Will be called by the transport layer to pass a chunk on to
 /// the application. There is one ChunkListener per Object.
 /// Number of application tlvs in this chunk in `nr_tlv`.
-pub type ChunkListener = fn (chunk: &Vec<u8>, id: ChunkId, nr_tlv: u8) -> ();
+pub type ChunkListener = dyn FnMut (Vec<u8>, ChunkId, u8) -> ();
 
 pub struct ObjectReceiveJob {
-    pub chunk_received_callback: ChunkListener,
+    pub chunk_received_callback: Box<ChunkListener>,
     /// Metadata about the object.
     pub object: Object,
     /// Abort receiving by setting this flag to true.
