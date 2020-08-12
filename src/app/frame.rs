@@ -210,7 +210,7 @@ pub struct MetadataEntry {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct FileMetadata {
-    metadata_entries: Vec<MetadataEntry>,
+    pub metadata_entries: Vec<MetadataEntry>,
 }
 
 impl WireFormat for FileMetadata {

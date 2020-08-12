@@ -4,8 +4,10 @@ use crate::options::Options;
 use crate::transport::client;
 use crate::transport::jobs::*;
 use crate::transport::frame::*;
+use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
 
 use std::fs;
+use std::io::{Seek, SeekFrom, Write, Read};
 use std::collections::{HashMap, HashSet};
 use log::info;
 use log::error;
@@ -15,7 +17,9 @@ use std::rc::Rc;
 use itertools::Chunk;
 use num::{FromPrimitive, ToPrimitive};
 use std::process::exit;
-use std::ops::DerefMut;
+use std::ops::{DerefMut, Deref};
+
+const DEFAULT_CHUNK_SIZE:u64 = 512;
 
 #[derive(PartialEq, Eq)]
 enum State {
@@ -25,6 +29,8 @@ enum State {
 }
 
 struct FileReceiveState {
+    name: String,
+    size: u64,
     device: Option<fs::File>,
     missing_chunks: HashSet<ChunkId>,
     all_received_until: ChunkId
@@ -32,11 +38,81 @@ struct FileReceiveState {
 
 impl FileReceiveState {
     fn notify_metadata(&mut self, metadata: &FileMetadata) {
-        todo!();
+        for entry in &metadata.metadata_entries {
+            match entry.code {
+                MetadataEntryType::FileName => {
+                    if !self.name.is_empty() {
+                        log::error!("Got file name metadata twice!");
+                        continue
+                    }
+                    self.name = match String::from_utf8(entry.content.clone()) {
+                        Ok(name) => name,
+                        Err(e) => {log::error!("Failed to parse name!"); continue}
+                    };
+                    log::info!(" Got a file name: {}", self.name);
+                    let mut file = fs::File::create(self.name.to_string()).unwrap();
+                    if self.size > 0 {
+                        file.set_len(self.size);
+                    }
+                    self.device = Option::Some(file);
+                },
+                MetadataEntryType::FileSize => {
+                    if self.size > 0 {
+                        log::error!("Got nonzero size metadata twice!");
+                        continue
+                    }
+                    let mut cursor = Cursor::new(entry.content.clone());
+                    self.size = match cursor.read_u64::<NetworkEndian>() {
+                        Ok(size) => size,
+                        Err(e) => {log::error!("Failed to parse size!"); continue}
+                    };
+                    log::info!(" Got a file size: {}", self.size);
+                    let num_chunks = (self.size + DEFAULT_CHUNK_SIZE - 1) / DEFAULT_CHUNK_SIZE;
+                    for i in 0..num_chunks {
+                        self.missing_chunks.insert(i as ChunkId);
+                    }
+                    log::info!("  Expecting {} chunks.", self.missing_chunks.len());
+                    match &mut self.device {
+                        Some(file) => file.set_len(self.size).expect("Set length failed."),
+                        _ => {}
+                    }
+                },
+                _ => {}
+            }
+        }
     }
 
-    fn notify_content(&mut self, content: &FileContent) {
-        todo!();
+    fn notify_content(&mut self, content: &FileContent, mut chunk_id: ChunkId, fields: &HashMap<ObjectFieldType, ChunkId>) {
+        if self.device.is_none() {
+            log::warn!("Ignoring chunk received before file was initialised.");
+            return
+        }
+        if self.done() {
+            log::warn!("Ignoring unexpected chunk, I am done or I haven't started.");
+            return
+        }
+        let num_metadata_chunks = match fields.get(&AppObjectFieldType::FileResponseMetadata.to_u8().unwrap()) {
+            Some(val) => *val,
+            _ => {log::warn!("The metadata field does not exist??"); 0}
+        };
+        chunk_id -= num_metadata_chunks;
+        if !self.missing_chunks.contains(&chunk_id) {
+            log::warn!("Ignoring unexpected chunk with ID {}", chunk_id);
+            return
+        }
+        self.missing_chunks.remove(&chunk_id);
+        log::info!(" Writing chunk {} to {}.", chunk_id, self.name);
+        match &mut self.device {
+            Some(file) => {
+                file.seek(SeekFrom::Start(chunk_id as u64 * DEFAULT_CHUNK_SIZE));
+                file.write(content.content.as_ref());
+            },
+            _ => {log::error!("The file handle is gone."); return}
+        }
+    }
+
+    fn done(&self) -> bool {
+        self.missing_chunks.is_empty()
     }
 }
 
@@ -47,6 +123,8 @@ enum ObjectTransferState {
 impl Default for ObjectTransferState {
     fn default() -> Self {
         ObjectTransferState::File(FileReceiveState{
+            name: String::from("unknown"),
+            size: 0,
             device: None,
             missing_chunks: HashSet::new(),
             all_received_until: -1
@@ -89,8 +167,18 @@ impl StateMachine {
     }
 
     fn all_files_received(&self) -> bool {
-        todo!();
-        return false;
+        let mut num_received_files = 0;
+        for transfer_state in &self.recv_state {
+            let state = transfer_state.1.borrow();
+            match state.deref() {
+                ObjectTransferState::File(f) => {
+                    if f.done() {
+                        num_received_files += 1;
+                    }
+                }
+            }
+        }
+        num_received_files == self.expected_files.len()
     }
 
     fn file_request_job(&mut self, files: Vec<String>) -> ObjectSendJob {
@@ -126,9 +214,9 @@ impl StateMachine {
     fn register_recv_job(state_machine: &Rc<RefCell<StateMachine>>, recv_job: &mut ObjectReceiveJob)
     {
         let object_info = (recv_job.object.object_type, recv_job.object.object_id);
-        let mut object_fields = Vec::new();
+        let mut field_length = HashMap::new();
         for field in &recv_job.object.fields {
-            object_fields.push(field.clone());
+            field_length.insert(field.field_type, field.length);
         }
         state_machine.borrow_mut().recv_state.insert(object_info.clone(), RefCell::new(ObjectTransferState::default()));
         let state_machine_ref = Rc::clone(state_machine);
@@ -155,7 +243,7 @@ impl StateMachine {
                             f.notify_metadata(metadata_tlv);
                         },
                         (AppTlv::FileContent(content_tlv), ObjectTransferState::File(f)) => {
-                            f.notify_content(content_tlv);
+                            f.notify_content(content_tlv, chunk_id, &field_length);
                         },
                         (AppTlv::ApplicationError(err_tlv), _) => {
                             log::error!(" Received server error (code {})", err_tlv.error_code.to_u8().unwrap());
