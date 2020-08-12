@@ -79,7 +79,7 @@ impl Connection{
     /// non-blocking
     fn receive_once(&mut self) {
         // try to receive a packet
-        let mut buf: Vec<u8> = Vec::new();
+        let mut buf: [u8; MAX_UDP_BUFSIZE] = [0; MAX_UDP_BUFSIZE];
         let mut message_frame = MessageFrame::default();
         if let Ok(n_bytes) = self.socket.recv(&mut buf) {
             let mut cursor = Cursor::new(buf[0..n_bytes].to_vec());
@@ -90,7 +90,11 @@ impl Connection{
                 },
                 _ => {},
             }
+        } else {
+            // no packets received
+            return;
         }
+        log::trace!("Received: proto version {}, sid {}, n_tlvs {}", message_frame.version, message_frame.sid, message_frame.tlvs.len());
 
         // check protocol version
         if message_frame.version != PROTOCOL_VERSION {
@@ -98,7 +102,7 @@ impl Connection{
         }
 
         // get first tlv
-        if message_frame.tlvs.len() <= 1 {
+        if message_frame.tlvs.len() <= 0 {
             log::warn!("Received MessageFrame without tlvs.");
             return;
         }
@@ -112,6 +116,8 @@ impl Connection{
                 self.peer_info = Some(i);
                 if self.is_server {
                     self.send_handshake();
+                } else {
+                    self.session = Some(EstablishedState::be_gentle(message_frame.sid));
                 }
             } else {
                 log::debug!("This is not the HostInformation tlv we are waiting for. It must be the first TLV in a message.");
@@ -126,7 +132,6 @@ impl Connection{
         //let session: EstablishedState = self.session.unwrap();
 
         log::info!("Session (id: {}) established.", self.session.as_ref().unwrap().sessionid);
-        todo!();
     }
 
     /// must be called before anything is sent.
@@ -137,7 +142,7 @@ impl Connection{
         frame.version = PROTOCOL_VERSION;
         if self.is_server {
             // set random session id
-            frame.sid = thread_rng().gen();
+            frame.sid = thread_rng().gen_range(1, 2^64);
         } else {
             // we are a client
             frame.sid = 0;
@@ -147,7 +152,8 @@ impl Connection{
         // serialize and send frame
         let mut cursor = Cursor::new(Vec::new());
         frame.write(&mut cursor);
-        self.socket.send(&(cursor.into_inner()));
+        let buf = cursor.into_inner();
+        let n_sent = self.socket.send(&buf).unwrap();
 
         // now we can carefully initialize the session
         self.session = Some(EstablishedState::be_gentle(frame.sid));
@@ -165,5 +171,51 @@ impl EstablishedState {
         Self {
             sessionid,
         }
+    }
+}
+
+mod test {
+    #[test]
+    fn handshake() {
+        use env_logger;
+        env_logger::init();
+        use crate::transport::client;
+        use crate::transport::server;
+        use crate::transport::connection::*;
+        use std::time::Duration;
+        use std::thread;
+
+        let mut connection_listener = server::Listener::new("0.0.0.0:8080".parse().unwrap());
+        let mut server_conn: Option<Connection> = connection_listener.listen_once(
+            Box::new(|a|{}),
+            Box::new(||{}));
+        assert_eq!(server_conn.is_none(), true);
+
+        let mut client_conn = client::connect(
+            "127.0.0.1:8080".parse().unwrap(),
+            Box::new(|a|{}),
+            Box::new(||{}),
+            );
+        thread::sleep(Duration::from_secs_f32(0.1));
+       
+        client_conn.receive_and_send();
+        // initialized, but not complete yet
+        assert_eq!(client_conn.session.as_ref().unwrap().sessionid, 0);
+
+        server_conn = connection_listener.listen_once(
+            Box::new(|a|{}),
+            Box::new(||{}));
+        assert_eq!(server_conn.is_some(), true);
+
+        client_conn.receive_and_send();
+        assert_eq!(client_conn.session.as_ref().unwrap().sessionid, 0);
+
+        let mut server_conn = server_conn.unwrap();
+        server_conn.receive_and_send();
+        // assert initialized
+        assert_ne!(server_conn.session.unwrap().sessionid, 0);
+
+        client_conn.receive_and_send();
+        assert_ne!(client_conn.session.as_ref().unwrap().sessionid, 0);
     }
 }

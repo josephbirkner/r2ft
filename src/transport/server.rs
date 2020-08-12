@@ -19,12 +19,13 @@ impl Listener {
     /// non-blocking.
     pub fn listen_once(&mut self, accept_callback: Box<ObjectListener>, timeout_callback: Box<TimeoutListener>) -> Option<Connection> {
         // try to consume the socket to transfer its ownership to Connection
-        if let Some(socket) = self.socket.take() {
+        if let Some(socket) = &mut self.socket {
             let mut buf: [u8; 10] = [0; 10];
             if let Ok((_n_bytes, src)) = socket.peek_from(&mut buf) {
                 // heureka! We got a client!
+                let socket = self.socket.take().unwrap(); // consume known existing socket
                 socket.connect(src).unwrap();
-                let mut conn = Connection {
+                let conn = Connection {
                     send_jobs: Vec::new(),
                     recv_jobs: Vec::new(),
                     accept_callback,
@@ -39,10 +40,10 @@ impl Listener {
                 return Some(conn);
             };
             return None;
-        } else {
-            // socket already consumed.
-            log::warn!("Listening on dead Listener. It is dead because it has already produced a connection. If the connection is completed, instanciate a new listener. ");
-            return None;
         }
+
+        // socket already consumed.
+        log::warn!("Listening on dead Listener. It is dead because it has already produced a connection. If the connection is completed, instanciate a new listener. ");
+        return None;
     }
 }

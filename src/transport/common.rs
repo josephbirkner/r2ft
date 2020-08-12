@@ -3,6 +3,7 @@ use crate::transport::frame::*;
 
 pub const APP_VERSION: Version = 0;
 pub const PROTOCOL_VERSION: Version = 2;
+pub const MAX_UDP_BUFSIZE: usize = 9000;
 
 //////////////////////
 // util
