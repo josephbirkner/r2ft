@@ -1,5 +1,7 @@
 use std::net::{SocketAddr, UdpSocket};
 use crate::transport::connection::*;
+use crate::transport::frame::*;
+use crate::transport::common::default_host_info;
 use log;
 
 pub struct Listener {
@@ -20,14 +22,19 @@ impl Listener {
         if let Some(socket) = self.socket.take() {
             let mut buf: [u8; 10] = [0; 10];
             if let Ok((_n_bytes, src)) = socket.peek_from(&mut buf) {
+                // heureka! We got a client!
                 socket.connect(src).unwrap();
-                let conn = Connection {
+                let mut conn = Connection {
                     send_jobs: Vec::new(),
                     recv_jobs: Vec::new(),
                     accept_callback,
                     timeout_callback,
                     socket,
-                    dest: src
+                    dest: src,
+                    is_server: true,
+                    self_info: default_host_info(),
+                    peer_info: None,
+                    session: None,
                 };
                 return Some(conn);
             };

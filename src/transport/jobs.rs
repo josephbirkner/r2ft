@@ -56,6 +56,10 @@ impl ObjectSendJob {
     pub fn object_id(&self) -> ObjectId {
         self.object_in_transfer.object_id
     }
+
+    pub(super) fn send_step(&mut self) {
+        
+    }
 }
 
 //////////////////////////

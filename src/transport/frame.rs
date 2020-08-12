@@ -129,9 +129,9 @@ impl WireFormat for Tlv {
 /////////////////////////////////
 // HostInformation
 
-#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq)]
+#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq, Clone)]
 #[repr(u8)]
-enum AckFreq {
+pub enum AckFreq {
     Default = 0x0,
     Min = 0x10,
     Max = 0x11,
@@ -141,9 +141,9 @@ impl Default for AckFreq {
     fn default() -> Self {AckFreq::Default}
 }
 
-#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq)]
+#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq, Clone)]
 #[repr(u8)]
-enum HostOs {
+pub enum HostOs {
     Linux = 1,
     Windows = 2,
     MacOS = 3,
@@ -156,9 +156,9 @@ impl Default for HostOs {
     fn default() -> Self {HostOs::Linux}
 }
 
-#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq)]
+#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq, Clone)]
 #[repr(u8)]
-enum ApplicationId {
+pub enum ApplicationId {
     SOFT = 1
 }
 
@@ -166,14 +166,14 @@ impl Default for ApplicationId {
     fn default() -> Self {ApplicationId::SOFT}
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct HostInformation {
-    rcv_window_size: u64, // LEB128
-    out_of_order_limit: u8,
-    ack_freq: AckFreq,
-    os: HostOs,
-    app: ApplicationId,
-    app_ver: Version
+    pub rcv_window_size: u64, // LEB128
+    pub out_of_order_limit: u8,
+    pub ack_freq: AckFreq,
+    pub os: HostOs,
+    pub app: ApplicationId,
+    pub app_ver: Version
 }
 
 impl WireFormat for HostInformation {

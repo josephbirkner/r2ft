@@ -5,6 +5,8 @@ pub mod connection;
 pub mod server;
 pub mod client;
 
+mod common;
+
 #[cfg(test)]
 mod test;
 

@@ -1,6 +1,7 @@
 use std::net::{SocketAddr, UdpSocket};
 use crate::common::udp::{Socket};
 use crate::transport::connection::*;
+use crate::transport::common::default_host_info;
 
 use rand::{thread_rng, Rng};
 
@@ -19,14 +20,20 @@ pub fn connect(dest: SocketAddr, accept_callback: Box<ObjectListener>, timeout_c
     socket.set_nonblocking(true).unwrap();
     socket.connect(dest).unwrap();
 
-    let conn = Connection {
+    let mut conn = Connection {
         send_jobs: Vec::new(),
         recv_jobs: Vec::new(),
         accept_callback,
         timeout_callback,
         socket,
-        dest
+        dest,
+        is_server: false,
+        self_info: default_host_info(),
+        peer_info: None,
+        session: None,
     };
+
+    conn.send_handshake();
 
     return conn;
 }
