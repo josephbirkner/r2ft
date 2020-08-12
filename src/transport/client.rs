@@ -1,5 +1,8 @@
-use std::net::SocketAddr;
+use std::net::{SocketAddr, UdpSocket};
+use crate::common::udp::{Socket};
 use crate::transport::connection::*;
+
+use rand::{thread_rng, Rng};
 
 /// Called by an application to create a `Connection`. Will bind
 /// to `0.0.0.0:random` as src addr.
@@ -7,5 +10,23 @@ use crate::transport::connection::*;
 /// be established with handshake and everything while being granted
 /// cpu_time by `Connection.grant_cpu()`.
 pub fn connect(dest: SocketAddr, accept_callback: ObjectListener, timeout_callback: TimeoutListener) -> Connection {
-    unimplemented!();
+    // bind to a random local port from ephemeral port range
+    let bind: SocketAddr = "0.0.0.0:0".parse().unwrap();
+    let port: u16 = thread_rng().gen_range(49152, 65535);
+    bind.set_port(port);
+
+    let socket: UdpSocket = UdpSocket::bind(bind).expect("Could not bind to Socket.");
+    socket.set_nonblocking(true);
+    socket.connect(dest);
+
+    let conn = Connection {
+        send_jobs: Vec::new(),
+        recv_jobs: Vec::new(),
+        accept_callback,
+        timeout_callback,
+        socket,
+        dest
+    };
+
+    return conn;
 }

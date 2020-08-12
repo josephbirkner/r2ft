@@ -7,7 +7,7 @@ type Buffer = [u8; 16];
 
 /// UdpPacket with a buffer filled up to usize sent by SocketAddr.
 #[derive(Debug)]
-pub struct Packet (Buffer, usize, SocketAddr);
+pub struct Packet (pub Buffer, pub usize, pub SocketAddr);
 
 impl PartialEq for Packet {
     fn eq(&self, other: &Self) -> bool {
