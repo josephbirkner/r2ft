@@ -16,8 +16,8 @@ pub fn connect(dest: SocketAddr, accept_callback: Box<ObjectListener>, timeout_c
     bind.set_port(port);
 
     let socket: UdpSocket = UdpSocket::bind(bind).expect("Could not bind to Socket.");
-    socket.set_nonblocking(true);
-    socket.connect(dest);
+    socket.set_nonblocking(true).unwrap();
+    socket.connect(dest).unwrap();
 
     let conn = Connection {
         send_jobs: Vec::new(),
