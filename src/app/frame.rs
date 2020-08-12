@@ -118,7 +118,7 @@ impl WireFormat for AppTlv {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct FileRequest {
-    file_paths: Vec<String>,
+    pub file_paths: Vec<String>,
 }
 
 impl WireFormat for FileRequest {
@@ -148,7 +148,7 @@ impl WireFormat for FileRequest {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct FileResume {
-    file_ids_and_chunk_ids: Vec<(FileId, i64)>,
+    pub file_ids_and_chunk_ids: Vec<(FileId, i64)>,
 }
 
 impl WireFormat for FileResume {
@@ -204,8 +204,8 @@ impl Default for MetadataEntryType {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct MetadataEntry {
-    code: MetadataEntryType,
-    content: Vec<u8>,
+    pub code: MetadataEntryType,
+    pub content: Vec<u8>,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -256,7 +256,7 @@ impl WireFormat for FileMetadata {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct FileContent {
-    content: Vec<u8>,
+    pub content: Vec<u8>,
 }
 
 impl WireFormat for FileContent {
@@ -313,8 +313,8 @@ impl Default for AppErrorData {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct ApplicationError {
-    error_code: AppErrorCode,
-    error_data: AppErrorData,
+    pub error_code: AppErrorCode,
+    pub error_data: AppErrorData,
 }
 
 impl WireFormat for ApplicationError {
@@ -391,9 +391,9 @@ impl WireFormat for ApplicationError {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct FileListRequest {
-    path: String,
-    level_of_recursion: u8,
-    format_code: u8,
+    pub path: String,
+    pub level_of_recursion: u8,
+    pub format_code: u8,
 }
 
 pub const DEFAULT_FORMAT_CODE: u8 = 0x01;
@@ -422,7 +422,7 @@ impl WireFormat for FileListRequest {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct FileListResponse {
-    file_list_entries: Vec<FileListEntry>,
+    pub file_list_entries: Vec<FileListEntry>,
 }
 
 #[derive(FromPrimitive, ToPrimitive, Debug, PartialEq)]
@@ -438,10 +438,10 @@ impl Default for FileListEntryType {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct FileListEntry {
-    entry_type: FileListEntryType,
-    parent: FileId,
-    name: String,
-    id: FileId
+    pub entry_type: FileListEntryType,
+    pub parent: FileId,
+    pub name: String,
+    pub id: FileId
 }
 
 impl WireFormat for FileListResponse {

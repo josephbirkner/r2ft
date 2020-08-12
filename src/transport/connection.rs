@@ -10,11 +10,11 @@ use std::rc::Rc;
 /// about new receiving Objects.
 /// The application returns None, if it is not interested in the Object.
 /// Otherwise the application returns its ChunkListener for that Object.
-pub type ObjectListener = fn (receiver: ObjectReceiveJob) -> ();
+pub type ObjectListener = dyn FnMut (ObjectReceiveJob) -> ();
 
 /// Will be called by the transport layer to inform the application
 /// about a timeout of a connection.
-pub type TimeoutListener = FnMut () -> ();
+pub type TimeoutListener = dyn FnMut () -> ();
 
 /// Constructors for `Connection` are found in `super::{client, server}`.
 pub struct Connection {

@@ -7,20 +7,20 @@ use crate::transport::frame::*;
 /// While using a `Connection` the application will provide callbacks to
 /// receive and provide chunks of this object.
 pub struct Object {
-    object_type: ObjectType,
-    object_id: ObjectId,
-    fields: Vec<ObjectFieldDescription>,
-    transmission_finished_callback: TransmissionFinishedListener,
+    pub object_type: ObjectType,
+    pub object_id: ObjectId,
+    pub fields: Vec<ObjectFieldDescription>,
+    pub transmission_finished_callback: Box<TransmissionFinishedListener>,
 }
 
 /// Called by transport layer while it is working
 /// on an ObjectSendJob.
-/// Number of application tlvs in this chunk are returned in as second 
+/// Number of application tlvs in this chunk are returned in as second
 /// element of the tuple.
-pub type ChunkProvider = fn (chunk_id: ChunkId) -> (Vec<u8>, u8);
+pub type ChunkProvider = dyn FnMut (ChunkId) -> (Vec<u8>, u8);
 
 /// Called by connection once transfer is done.
-pub type TransmissionFinishedListener = fn() -> ();
+pub type TransmissionFinishedListener = dyn FnMut() -> ();
 
 //////////////////////////
 // ObjectSendJob
@@ -36,12 +36,17 @@ pub struct ObjectSendJob {
     /// Object instance that was passed to new()
     object_in_transfer: Object,
     /// Callback which is used by the connection to retrieve chunks.
-    get_chunk_callback: ChunkProvider,
+    get_chunk_callback: Box<ChunkProvider>,
 }
 
 impl ObjectSendJob {
-    pub fn new(obj: &Object, chunk_getter: ChunkProvider) -> Self {
-        todo!();
+    pub fn new(obj: Object, chunk_getter: Box<ChunkProvider>) -> Self {
+        ObjectSendJob {
+            abort: false,
+            next_chunk: -1,
+            object_in_transfer: obj,
+            get_chunk_callback: chunk_getter
+        }
     }
 
     pub fn object_type(&self) -> ObjectType {
