@@ -8,6 +8,7 @@ use log;
 use rand::{thread_rng, Rng};
 use crate::transport::common::*;
 use std::iter::Iterator;
+use crate::transport::client::connect;
 
 //////////////////////////
 // Connection
@@ -109,19 +110,38 @@ impl Connection{
         let tlv: Tlv = message_frame.tlvs.remove(0);
 
         // check if handshake is done
-        if self.peer_info.is_none() {
+        match (&self.peer_info, tlv) {
             // we are waiting for peer info
-            if let Tlv::HostInformation(i) = tlv {
+            (None, Tlv::HostInformation(hi)) => {
                 // save peer info and complete handshake
-                self.peer_info = Some(i);
+                self.peer_info = Some(hi);
                 if self.is_server {
                     self.send_handshake();
                 } else {
                     self.session = Some(EstablishedState::be_gentle(message_frame.sid));
                 }
-            } else {
+            },
+            (None, _) => {
                 log::debug!("This is not the HostInformation tlv we are waiting for. It must be the first TLV in a message.");
                 return;
+            },
+            (_, Tlv::ObjectHeader(oh)) => {
+                self.recv_jobs.push(ObjectReceiveJob{
+                    chunk_received_callback: Box::new(|_, _, _|{}),
+                    object: Object {
+                        object_type: oh.object_type,
+                        object_id: oh.object_id,
+                        fields: oh.fields,
+                        transmission_finished_callback: Box::new(||{})
+                    },
+                    abort: false
+                });
+            },
+            (_, Tlv::ObjectChunk(oh)) => {
+                unimplemented!()
+            },
+            (_, _) => {
+                unimplemented!()
             }
         }
         // if is_server: we have received and send HostInfos.
