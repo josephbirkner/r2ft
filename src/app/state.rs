@@ -260,7 +260,11 @@ impl StateMachine {
             Err(_) => {
                 log::error!("Failed to open {}", file_path);
                 todo!("push_error_send_job()");
-                return;
+                /*self.push_error_send_job(ApplicationError {
+                    error_code: AppErrorCode::FileAbort,
+                    error_data: AppErrorData::Paths(vec![file_path.clone()]),
+                });
+                return;*/
             }
         };
         let meta = match file.metadata() {
@@ -383,6 +387,30 @@ impl StateMachine {
                 };
                 let mut cursor = Cursor::new(Vec::new());
                 tlv_to_send.write(&mut cursor);
+                (cursor.into_inner(), 1)
+            }),
+        );
+        self.send_job_outbox.push(new_send_job);
+    }
+
+    pub fn push_error_send_job(&mut self, app_err: ApplicationError) {
+        // The given application error will be sent via a single TLV (thus will not work for large payloads)
+        // extending to large lists of file paths probably won't make much sense.
+        let new_send_job = ObjectSendJob::new(
+            Object {
+                object_type: AppObjectType::ErrorReport.to_u8().unwrap(),
+                object_id: self.get_next_object_id(),
+                fields: vec![ObjectFieldDescription {
+                    field_type: AppObjectFieldType::ErrorReportContent.to_u8().unwrap(),
+                    length: 1, // in nr. of chunks
+                }],
+                transmission_finished_callback: Box::new(move || {
+                    log::info!("Error fully transmitted.");
+                }),
+            },
+            Box::new(move |chunk_id: ChunkId| {
+                let mut cursor = Cursor::new(Vec::new());
+                app_err.write(&mut cursor);
                 (cursor.into_inner(), 1)
             }),
         );
