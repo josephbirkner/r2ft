@@ -8,7 +8,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::rc::Rc;
 
 /// Run server on current working directory
-pub fn run(opt: Options) -> std::result::Result<(), ()> {
+pub fn run(opt: Options, listen_addr: Ipv4Addr) -> std::result::Result<(), ()> {
     //////////////////////////////
     // Server client startup.
     info!(
@@ -23,10 +23,7 @@ pub fn run(opt: Options) -> std::result::Result<(), ()> {
 
     //////////////////////////////
     // Create server for listening
-    let mut server = Listener::new(SocketAddr::V4(SocketAddrV4::new(
-        Ipv4Addr::new(127, 0, 0, 1),
-        opt.port,
-    )));
+    let mut server = Listener::new(SocketAddr::V4(SocketAddrV4::new(listen_addr, opt.port)));
 
     //////////////////////////////
     // Wait until reception is done.

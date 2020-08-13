@@ -1,6 +1,8 @@
 use clap;
 use env_logger;
 use rft::*;
+use std::net::Ipv4Addr;
+use std::str::FromStr;
 
 fn main() {
     // Initialize logger.
@@ -51,8 +53,14 @@ fn main() {
             .conflicts_with_all(&["s", "list"])
         )
         // Other options:
+        .arg(clap::Arg::with_name("u")
+            .help("address for listening")
+            .short("u")
+            .takes_value(true)
+            .conflicts_with_all(&["file", "list"])
+        )
         .arg(clap::Arg::with_name("list")
-            .help("file list retrival")
+            .help("remote directory for file list retrival")
             .short("l")
             .required(true)
             .takes_value(true)
@@ -76,8 +84,18 @@ fn main() {
     }
 
     if matches.is_present("s") {
+        let listen_addr = if let Some(u) = matches.value_of("u") {
+            if let Ok(v) = Ipv4Addr::from_str(u) {
+                v
+            } else {
+                Ipv4Addr::LOCALHOST
+            }
+        } else {
+            Ipv4Addr::LOCALHOST
+        };
+
         // server mode
-        std::process::exit(match app::server::run(opt) {
+        std::process::exit(match app::server::run(opt, listen_addr) {
             Ok(_) => 0,
             Err(e) => {
                 eprintln!("{:?}", e);
