@@ -59,16 +59,39 @@ impl Connection {
 
     fn send_once(&mut self, i: usize) {
         //let mut job: ObjectSendJob = self.send_jobs.remove(i);
-        // get session or return
-        let session: &EstablishedState;
-        if let Some(s) = &self.session {
-            session = s;
-        } else {
+        // only send, if state is established
+        if self.session.is_none() {
             log::warn!("Connection.send_once(): Session not yet established.");
             return;
         }
 
-        self.send_jobs[i].send_step();
+        let session = self.session.take().expect("We just checked it is here.");
+        let (chunk, n_tlvs) = self.send_jobs[i].send_next(&session);
+
+        // build ObjectChunk message
+        let mut msg: MessageFrame = MessageFrame::default();
+        msg.sid = session.sessionid;
+        msg.version = PROTOCOL_VERSION;
+        msg.tlvs = Vec::new();
+        let oc: ObjectChunk = ObjectChunk {
+            object_id: self.send_jobs[i].object_id(),
+            chunk_id: self.send_jobs[i].next_chunk,
+            more_chunks: self.send_jobs[i].has_next(),
+            ack_required: self.send_jobs[i].ack_required(),
+            num_enclosed_msgs: n_tlvs,
+            data: chunk,
+        };
+        msg.tlvs.push(Tlv::ObjectChunk(oc));
+
+        // serialize and send frame
+        let mut cursor = Cursor::new(Vec::new());
+        msg.write(&mut cursor);
+        let buf = cursor.into_inner();
+        let n_sent = self.socket.send(&buf).unwrap();
+        assert_eq!(n_sent, buf.len());
+
+        self.send_jobs[i].next_chunk += 1;
+        self.session = Some(session);
     }
 
     /// receive the next packet

@@ -1,4 +1,5 @@
 use crate::transport::frame::*;
+use crate::transport::connection::*;
 
 //////////////////////////
 // Object metatype
@@ -31,7 +32,8 @@ pub struct ObjectSendJob {
     /// Abort sending by setting this flag to true.
     pub abort: bool,
     /// Use this field to indicate at which chunk id
-    /// the transmission should proceed.
+    /// the transmission should proceed. Not to be changed
+    /// by the SendJob itself.
     pub next_chunk: ChunkId,
     /// Object instance that was passed to new()
     object_in_transfer: Object,
@@ -57,7 +59,23 @@ impl ObjectSendJob {
         self.object_in_transfer.object_id
     }
 
-    pub(super) fn send_step(&mut self) {}
+    /// TODO
+    pub(super) fn ack_required(&self) -> bool {
+        false
+    }
+
+    /// wether self has a chunk after next_chunk
+    pub(super) fn has_next(&self) -> bool {
+        let n_chunks: ChunkId = self.object_in_transfer.fields.iter().map(|field| field.length).sum();
+        let last_chunk = n_chunks - 1;
+        return self.next_chunk < last_chunk;
+    }
+
+    /// advances the state for having sent the returned chunk
+    pub(super) fn send_next(&mut self, mut conn: &EstablishedState) -> (Vec<u8>, u8) {
+        let (chunk, n_tlvs) = (self.get_chunk_callback)(self.next_chunk);
+        return (chunk, n_tlvs);
+    }
 }
 
 //////////////////////////
