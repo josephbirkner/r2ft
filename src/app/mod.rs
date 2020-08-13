@@ -3,3 +3,4 @@ pub mod get;
 pub mod ls;
 pub mod server;
 pub mod state;
+pub mod test;
