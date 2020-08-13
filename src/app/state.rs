@@ -14,6 +14,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::rc::Rc;
+use std::cmp::PartialEq;
 
 const DEFAULT_CHUNK_SIZE: u64 = 512;
 
@@ -32,6 +33,7 @@ pub struct FileSendState {
 pub struct FileRecvState {
     pub name: String,
     pub size: u64,
+    pub sha3: Vec<u8>,
     pub device: Option<fs::File>,
     pub missing_chunks: HashSet<ChunkId>,
     pub num_chunks: u64,
@@ -88,6 +90,19 @@ impl FileRecvState {
                         _ => {}
                     }
                 }
+                MetadataEntryType::SHA3 => {
+                    if !self.sha3.is_empty() {
+                        log::warn!("Got SHA3_512 metadata twice!");
+                        continue;
+                    }
+                    let sha3 = entry.content.clone();
+                    if sha3.len() != 64 {
+                        log::warn!("Received SHA3 is not of length 512 bit!");
+                        continue;
+                    }
+                    self.sha3 = sha3;
+                    log::info!("Got a sha3_512 hash: {:?}", self.sha3);
+                }
                 _ => {}
             }
         }
@@ -135,6 +150,35 @@ impl FileRecvState {
                 if file.write(content.content.as_ref()).is_err() {
                     todo!("Implement error handling.");
                 }
+
+                if chunk_id as u64+1 == self.num_chunks {
+
+                    let mut buffer = Vec::new();
+                    // Must reopen file because it was closed by last 
+                    match fs::File::open(&self.name).unwrap().read_to_end(&mut buffer) {
+                        Err(e) => {
+                            error!("Could not produce hash for file.");
+                            todo!("Implement error handling.");
+                        }
+                        Ok(_) => {
+                            let mut hasher = Sha3_512::new();
+                            hasher.update(buffer);
+
+                            let result = hasher.finalize();
+
+                            let mut cursor = Cursor::new(Vec::new());
+                            if cursor.write(&result[..]).is_err() {
+                                todo!("Implement error handling");
+                            }
+                            if !self.sha3.eq(&cursor.into_inner()) {
+                                warn!("Received file has invalid hash.");
+                                return;
+                            } else {
+                                trace!("Hashes matched!");
+                            }
+                        }
+                    }
+                }
             }
             _ => {
                 log::error!("The file handle is gone.");
@@ -162,6 +206,7 @@ impl ObjectRecvState {
             Some(AppObjectType::FileResponse) => ObjectRecvState::File(FileRecvState {
                 name: String::from(""),
                 size: 0,
+                sha3: vec![],
                 device: None,
                 missing_chunks: HashSet::new(),
                 recv_until: -1,
@@ -338,7 +383,7 @@ impl StateMachine {
                                     cursor.into_inner()
                                 },
                             },
-                            /*MetadataEntry {
+                            MetadataEntry {
                                 code: MetadataEntryType::SHA3,
                                 content: {
                                     let mut buffer = Vec::new();
@@ -362,7 +407,7 @@ impl StateMachine {
                                         }
                                     }
                                 },
-                            },*/
+                            },
                         ],
                     }),
                     _ => AppTlv::FileContent(FileContent {
