@@ -48,7 +48,7 @@ impl FileRecvState {
                     }
                     self.name = match String::from_utf8(entry.content.clone()) {
                         Ok(name) => name,
-                        Err(e) => {
+                        Err(_) => {
                             log::error!("Failed to parse name!");
                             continue;
                         }
@@ -70,7 +70,7 @@ impl FileRecvState {
                     let mut cursor = Cursor::new(entry.content.clone());
                     self.size = match cursor.read_u64::<NetworkEndian>() {
                         Ok(size) => size,
-                        Err(e) => {
+                        Err(_) => {
                             log::error!("Failed to parse size!");
                             continue;
                         }
@@ -257,7 +257,7 @@ impl StateMachine {
     pub fn push_file_send_job(&mut self, file_path: String) {
         let file = match fs::File::open(file_path.clone()) {
             Ok(file_obj) => file_obj,
-            Err(e) => {
+            Err(_) => {
                 log::error!("Failed to open {}", file_path);
                 todo!("push_error_send_job()");
                 return;
@@ -265,7 +265,7 @@ impl StateMachine {
         };
         let meta = match file.metadata() {
             Ok(meta) => meta,
-            Err(e) => {
+            Err(_) => {
                 log::error!("Failed to get metadata for {}", file_path);
                 return;
             }

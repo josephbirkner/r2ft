@@ -210,6 +210,8 @@ macro_rules! write_str {
     ($cursor:ident, $value:expr) => {
         let buf = $value.clone().into_bytes();
         write_u128!($cursor, buf.len() as u64);
-        $cursor.write(&buf);
+        if $cursor.write(&buf).is_err() {
+            todo!("Implement error handling.")
+        }
     };
 }
