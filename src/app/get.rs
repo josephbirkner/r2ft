@@ -5,6 +5,7 @@ use log::info;
 use std::cell::RefCell;
 use std::net::SocketAddr;
 use std::rc::Rc;
+use std::{thread, time};
 
 /// Run client for file retrieval.
 pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::result::Result<(), ()> {
@@ -48,7 +49,8 @@ pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::resu
 
     //////////////////////////////
     // Wait until reception is done.
-    while !state_machine.borrow().is_finished() {
+    while !state_machine.borrow().is_finished()
+    {
         connection.receive_and_send();
 
         ///////////////////////////////////
@@ -71,6 +73,8 @@ pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::resu
         if state_machine.borrow().all_files_received() {
             state_machine.borrow_mut().finished();
         }
+
+        thread::sleep(time::Duration::from_millis(1));
     }
 
     Ok(())

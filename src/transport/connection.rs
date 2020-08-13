@@ -149,25 +149,25 @@ impl Connection {
                 return;
             }
             (_, Tlv::ObjectHeader(oh)) => {
-                todo!("Match peer info to correct connection.");
+                // todo!("Match peer info to correct connection.");
                 self.recv_jobs.push(ObjectReceiveJob {
                     chunk_received_callback: Box::new(|_, _, _| {}),
                     object: Object {
                         object_type: oh.object_type,
                         object_id: oh.object_id,
-                        fields: oh.fields,
+                        fields: Clone::clone(&oh.fields),
                         transmission_finished_callback: Box::new(|| {}),
                     },
                     abort: false,
                 });
             }
             (_, Tlv::ObjectChunk(oc)) => {
-                todo!("Match peer info to correct connection.");
+                // todo!("Match peer info to correct connection.");
                 match self.recv_jobs.iter_mut().find(|job|{
                     job.object.object_id == oc.object_id
                 }) {
                     Some(recv_job) => {
-                        let fun = &recv_job.chunk_received_callback;
+                        let fun = &mut recv_job.chunk_received_callback;
                         fun(oc.data.clone(), oc.chunk_id, oc.num_enclosed_msgs);
                     },
                     None =>

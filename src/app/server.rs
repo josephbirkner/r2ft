@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::env::current_dir;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::rc::Rc;
+use std::{thread, time};
 
 /// Run server on current working directory
 pub fn run(opt: Options, listen_addr: Ipv4Addr) -> std::result::Result<(), ()> {
@@ -27,7 +28,10 @@ pub fn run(opt: Options, listen_addr: Ipv4Addr) -> std::result::Result<(), ()> {
 
     //////////////////////////////
     // Wait until reception is done.
-    while !state_machine.borrow().is_finished() {
+    while !state_machine.borrow().is_finished()
+    {
+        thread::sleep(time::Duration::from_millis(1));
+
         ///////////////////////////////////
         // Create potential event handlers.
         let incoming_object_handler = Box::new(move |recv_job| {});
@@ -63,6 +67,8 @@ pub fn run(opt: Options, listen_addr: Ipv4Addr) -> std::result::Result<(), ()> {
                 }
             }
         }
+
+        thread::sleep(time::Duration::from_millis(1));
     }
 
     Ok(())
