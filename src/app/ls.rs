@@ -1,6 +1,6 @@
 use crate::options::Options;
-use std::net::SocketAddr;
 use log::*;
+use std::net::SocketAddr;
 
 /// Run client for file list retrieval.
 pub fn ls(opt: Options, socket_addr: SocketAddr, directory: &str) -> std::result::Result<(), ()> {

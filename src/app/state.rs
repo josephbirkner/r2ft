@@ -3,12 +3,14 @@ use crate::common::*;
 use crate::transport::frame::*;
 use crate::transport::jobs::*;
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
+use log::*;
 use num::{FromPrimitive, ToPrimitive};
+use sha3::{Digest, Sha3_512};
 use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::rc::Rc;
@@ -54,7 +56,9 @@ impl FileRecvState {
                     log::info!(" Got a file name: {}", self.name);
                     let file = fs::File::create(self.name.to_string()).unwrap();
                     if self.size > 0 {
-                        file.set_len(self.size);
+                        if file.set_len(self.size).is_err() {
+                            todo!("Implement error handling.");
+                        }
                     }
                     self.device = Option::Some(file);
                 }
@@ -118,8 +122,15 @@ impl FileRecvState {
         log::info!(" Writing chunk {} to {}.", chunk_id, self.name);
         match &mut self.device {
             Some(file) => {
-                file.seek(SeekFrom::Start(chunk_id as u64 * DEFAULT_CHUNK_SIZE));
-                file.write(content.content.as_ref());
+                if file
+                    .seek(SeekFrom::Start(chunk_id as u64 * DEFAULT_CHUNK_SIZE))
+                    .is_err()
+                {
+                    todo!("Implement error handling.");
+                }
+                if file.write(content.content.as_ref()).is_err() {
+                    todo!("Implement error handling.");
+                }
             }
             _ => {
                 log::error!("The file handle is gone.");
@@ -295,9 +306,9 @@ impl StateMachine {
                                 content: {
                                     log::info!(" Sending metadata for {}", send_state.path);
                                     let mut cursor = Cursor::new(Vec::new());
-                                    cursor
-                                        .write_u64::<NetworkEndian>(meta.len())
-                                        .expect("Size write failed.");
+                                    if cursor.write_u64::<NetworkEndian>(meta.len()).is_err() {
+                                        todo!("Implement error handling");
+                                    }
                                     cursor.into_inner()
                                 },
                             },
@@ -305,9 +316,14 @@ impl StateMachine {
                                 code: MetadataEntryType::FileName,
                                 content: {
                                     let mut cursor = Cursor::new(Vec::new());
-                                    cursor.write(
-                                        path.file_name().unwrap().to_str().unwrap().as_bytes(),
-                                    );
+                                    if cursor
+                                        .write(
+                                            path.file_name().unwrap().to_str().unwrap().as_bytes(),
+                                        )
+                                        .is_err()
+                                    {
+                                        todo!("Implement error handling");
+                                    }
                                     cursor.into_inner()
                                 },
                             },
@@ -318,9 +334,8 @@ impl StateMachine {
 
                                     match send_state.device.read_to_end(&mut buffer) {
                                         Err(e) => {
-                                            todo!("Implement error handling.");
                                             error!("Could not produce hash for file.");
-                                            vec![0x00; 64]
+                                            todo!("Implement error handling.");
                                         }
                                         Ok(_) => {
                                             let mut hasher = Sha3_512::new();
@@ -329,7 +344,9 @@ impl StateMachine {
                                             let result = hasher.finalize();
 
                                             let mut cursor = Cursor::new(Vec::new());
-                                            cursor.write(&result[..]);
+                                            if cursor.write(&result[..]).is_err() {
+                                                todo!("Implement error handling");
+                                            }
                                             cursor.into_inner()
                                         }
                                     }
@@ -348,7 +365,13 @@ impl StateMachine {
                             let content_chunk_idx = chunk_id - 1; // 1 metadata chunk
                             let mut result = Vec::new();
                             let start_pos = content_chunk_idx * DEFAULT_CHUNK_SIZE as i64;
-                            send_state.device.seek(SeekFrom::Start(start_pos as u64));
+                            if send_state
+                                .device
+                                .seek(SeekFrom::Start(start_pos as u64))
+                                .is_err()
+                            {
+                                todo!("Implement error handling.");
+                            }
                             let end_pos =
                                 min(start_pos + DEFAULT_CHUNK_SIZE as i64, meta.len() as i64);
                             for _ in start_pos..end_pos {

@@ -1,17 +1,18 @@
 use super::state::*;
 use crate::options::Options;
 use crate::transport::server::Listener;
+use log::*;
 use std::cell::RefCell;
 use std::env::current_dir;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::rc::Rc;
-use log::*;
 
 /// Run server on current working directory
 pub fn run(opt: Options) -> std::result::Result<(), ()> {
     //////////////////////////////
     // Server client startup.
-    info!("File server started with {}, working directory {}",
+    info!(
+        "File server started with {}, working directory {}",
         opt,
         current_dir().unwrap().display()
     );

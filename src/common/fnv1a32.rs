@@ -15,7 +15,7 @@ use core::hash::Hasher;
 use digest;
 #[cfg(feature = "generic")]
 use generic_array;
-use std::io::{Read};
+use std::io::Read;
 
 const FNV_OFFSET: u32 = 0x811C9DC5;
 const FNV_PRIME: u32 = 0x01000193;
@@ -74,7 +74,9 @@ impl Fnv32a {
         let mut byte: [u8; 1] = [0];
         cursor.set_position(from);
         for _ in from..to {
-            cursor.read_exact(&mut byte);
+            if cursor.read_exact(&mut byte).is_err() {
+                todo!("Implement error handling.");
+            }
             hasher.write(&byte);
         }
 

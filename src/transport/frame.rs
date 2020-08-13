@@ -489,10 +489,12 @@ impl WireFormat for ErrorMessage {
         read_tlv!(cursor, TlvType::ObjectChunk, {
             self.code = FromPrimitive::from_u8(read_u8!(cursor)).unwrap();
             self.detail = match &self.code {
-                ErrorCode::UnsupportedVersion => ErrorData::UnsupportedVersion(MaxMinSupportedVersion {
-                    max_ver: read_u8!(cursor),
-                    min_ver: read_u8!(cursor),
-                }),
+                ErrorCode::UnsupportedVersion => {
+                    ErrorData::UnsupportedVersion(MaxMinSupportedVersion {
+                        max_ver: read_u8!(cursor),
+                        min_ver: read_u8!(cursor),
+                    })
+                }
                 ErrorCode::ObjectAbort => {
                     let mut result = Vec::new();
                     let mut num_aborted_object_ids = read_u8!(cursor);

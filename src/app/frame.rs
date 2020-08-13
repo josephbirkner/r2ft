@@ -223,7 +223,9 @@ impl WireFormat for FileMetadata {
             for entry in &self.metadata_entries {
                 write_u8!(cursor, entry.code.to_u8().unwrap());
                 write_u8!(cursor, entry.content.len() as u8);
-                cursor.write(&entry.content);
+                if cursor.write(&entry.content).is_err() {
+                    todo!("Implement error handling.");
+                }
             }
         });
     }
@@ -265,7 +267,9 @@ pub struct FileContent {
 impl WireFormat for FileContent {
     fn write(&self, cursor: &mut Cursor) {
         write_tlv!(cursor, AppTlvType::FileContent, {
-            cursor.write(&self.content);
+            if cursor.write(&self.content).is_err() {
+                todo!("Implement error handling.");
+            }
         });
     }
 
