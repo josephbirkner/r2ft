@@ -1,6 +1,7 @@
 [package]
 name = "rft"
 version = "0.1.0"
+license = "MIT"
 authors = ["Peter Okelmann <okelmann@in.tum.de>", "Joseph Birkner <joseph.birkner@tum.de>", "Johannes Abel <abel@in.tum.de>"]
 edition = "2018"
 
