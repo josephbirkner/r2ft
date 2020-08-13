@@ -42,7 +42,7 @@ pub struct FileRecvState {
 }
 
 impl FileRecvState {
-    pub fn notify_metadata(&mut self, metadata: &FileMetadata) {
+    pub fn notify_metadata(&mut self, metadata: &FileMetadata) -> Result<(),()> {
         for entry in &metadata.metadata_entries {
             match entry.code {
                 MetadataEntryType::FileName => {
@@ -101,13 +101,14 @@ impl FileRecvState {
                         continue;
                     }
                     self.sha3 = sha3;
-                    log::info!("Got a sha3_512 hash: {:?}", self.sha3);
+                    log::trace!("Got a sha3_512 hash: {:?}", self.sha3);
                 }
                 _ => {}
             }
         }
         log::info!(" Header received.");
         self.header_received = true;
+        Ok(())
     }
 
     pub fn notify_content(
@@ -115,14 +116,14 @@ impl FileRecvState {
         content: &FileContent,
         mut chunk_id: ChunkId,
         fields: &HashMap<ObjectFieldType, ChunkId>,
-    ) {
+    ) -> Result<(),()> {
         if self.device.is_none() {
             log::warn!("Ignoring chunk received before file was initialised.");
-            return;
+            return Err(());
         }
         if self.done() {
             log::warn!("Ignoring unexpected chunk, I am done or I haven't started.");
-            return;
+            return Err(());
         }
         let num_metadata_chunks =
             match fields.get(&AppObjectFieldType::FileResponseMetadata.to_u8().unwrap()) {
@@ -135,7 +136,7 @@ impl FileRecvState {
         chunk_id -= num_metadata_chunks;
         if !self.missing_chunks.contains(&chunk_id) {
             log::warn!("Ignoring unexpected chunk with ID {}", chunk_id);
-            return;
+            return Err(());
         }
         self.missing_chunks.remove(&chunk_id);
         log::info!(" Writing chunk {}/{} to {}.", chunk_id+1, self.num_chunks, self.name);
@@ -145,10 +146,10 @@ impl FileRecvState {
                     .seek(SeekFrom::Start(chunk_id as u64 * DEFAULT_CHUNK_SIZE))
                     .is_err()
                 {
-                    todo!("Implement error handling.");
+                    return Err(());
                 }
                 if file.write(content.content.as_ref()).is_err() {
-                    todo!("Implement error handling.");
+                    return Err(());
                 }
 
                 if chunk_id as u64+1 == self.num_chunks {
@@ -158,7 +159,7 @@ impl FileRecvState {
                     match fs::File::open(&self.name).unwrap().read_to_end(&mut buffer) {
                         Err(e) => {
                             error!("Could not produce hash for file.");
-                            todo!("Implement error handling.");
+                            return Err(());
                         }
                         Ok(_) => {
                             let mut hasher = Sha3_512::new();
@@ -172,7 +173,7 @@ impl FileRecvState {
                             }
                             if !self.sha3.eq(&cursor.into_inner()) {
                                 warn!("Received file has invalid hash.");
-                                return;
+                                return Err(());
                             } else {
                                 trace!("Hashes matched!");
                             }
@@ -182,9 +183,10 @@ impl FileRecvState {
             }
             _ => {
                 log::error!("The file handle is gone.");
-                return;
+                return Err(());
             }
         }
+        Ok(())
     }
 
     pub fn done(&self) -> bool {
@@ -310,19 +312,22 @@ impl StateMachine {
         let file = match fs::File::open(file_path.clone()) {
             Ok(file_obj) => file_obj,
             Err(_) => {
-                log::error!("Failed to open {}", file_path);
-                todo!("push_error_send_job()");
-                /*self.push_error_send_job(ApplicationError {
-                    error_code: AppErrorCode::FileAbort,
+                log::error!("Failed to open file {}.", file_path);
+                self.push_error_send_job(ApplicationError {
+                    error_code: AppErrorCode::FileNotFound,
                     error_data: AppErrorData::Paths(vec![file_path.clone()]),
                 });
-                return;*/
+                return;
             }
         };
         let meta = match file.metadata() {
             Ok(meta) => meta,
             Err(_) => {
                 log::error!("Failed to get metadata for {}", file_path);
+                self.push_error_send_job(ApplicationError {
+                    error_code: AppErrorCode::FileAbort,
+                    error_data: AppErrorData::Paths(vec![file_path.clone()]),
+                });
                 return;
             }
         };
@@ -363,6 +368,7 @@ impl StateMachine {
                                     log::info!(" Sending metadata for {}", send_state.path);
                                     let mut cursor = Cursor::new(Vec::new());
                                     if cursor.write_u64::<NetworkEndian>(meta.len()).is_err() {
+                                        error!("Write failed.");
                                         todo!("Implement error handling");
                                     }
                                     cursor.into_inner()
@@ -378,6 +384,7 @@ impl StateMachine {
                                         )
                                         .is_err()
                                     {
+                                        error!("Write failed.");
                                         todo!("Implement error handling");
                                     }
                                     cursor.into_inner()
@@ -401,6 +408,7 @@ impl StateMachine {
 
                                             let mut cursor = Cursor::new(Vec::new());
                                             if cursor.write(&result[..]).is_err() {
+                                                error!("Write failed!");
                                                 todo!("Implement error handling");
                                             }
                                             cursor.into_inner()
@@ -426,6 +434,7 @@ impl StateMachine {
                                 .seek(SeekFrom::Start(start_pos as u64))
                                 .is_err()
                             {
+                                error!("Write failed!");
                                 todo!("Implement error handling.");
                             }
                             let end_pos =
