@@ -39,6 +39,7 @@ pub fn udp_payload_default() -> u32 {
 
 #[test]
 fn mtu() {
-    println!("from_virtual_file: {}", unix_virtual_file().unwrap_or(0));
-    println!("udp_payload: {}", udp_payload_default());
+    use env_logger;
+    log::debug!("from_virtual_file: {}", unix_virtual_file().unwrap_or(0));
+    log::debug!("udp_payload: {}", udp_payload_default());
 }

@@ -115,17 +115,17 @@ impl Hasher for Fnv32a {
 implement_digest!(Fnv32a, U2048, U4);
 
 mod test {
-
     use super::{Fnv32a, Hasher};
+    use env_logger;
 
     #[allow(unused)]
     fn test(a: u32, b: &[u8]) {
-        println!("\nTesting {:?}.", String::from_utf8_lossy(b));
+        log::trace!("\nTesting {:?}.", String::from_utf8_lossy(b));
         let mut hasher = Fnv32a::default();
         hasher.write(b);
-        println!("hash({:x?})", b);
+        log::trace!("hash({:x?})", b);
         let r = hasher.finish();
-        println!("Should: {:x}; Is: {:x}", a, r);
+        log::trace!("Should: {:x}; Is: {:x}", a, r);
         assert_eq!(r, a as u64)
     }
 
