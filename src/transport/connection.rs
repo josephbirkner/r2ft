@@ -52,10 +52,41 @@ impl Connection {
     /// with the user still.
     /// Must be called by the application in its main loop.
     pub fn receive_and_send(&mut self) {
+        self.send_acks();
         for i in 0..self.send_jobs.len() {
             self.send_once(i);
         }
         self.receive_once();
+    }
+
+    /// send acks for all receiving objects, if required
+    fn send_acks(&mut self) {
+        if self.session.is_none() { 
+            log::warn!("Refusing to Ack on a Connection which is not fully established.");
+            return;
+        }
+        let session = self.session.as_ref().unwrap();
+
+        // for all jobs collect ackables
+        let mut acks: Vec<(ObjectId, ChunkId)> = Vec::new();
+        for job in &self.recv_jobs {
+            if job.ack_req > -2 {
+                // ack required
+                acks.push((job.object.object_id, job.ack_req));
+            }
+        }
+
+        if acks.is_empty() { return; } // no acks to send
+
+        // build ObjectChunk message
+        let mut msg: MessageFrame = MessageFrame::default();
+        msg.sid = session.sessionid;
+        msg.version = PROTOCOL_VERSION;
+        msg.tlvs = Vec::new();
+        let ack: ObjectAck = ObjectAck {
+            acknowledged_object_chunks: acks
+        };
+        msg.tlvs.push(Tlv::ObjectAck(ack));
     }
 
     fn send_once(&mut self, i: usize) {
@@ -191,6 +222,10 @@ impl Connection {
                         None => log::warn!("Received AckReq for unknown Object.")
                     }
                 }
+            },
+            (_, Tlv::ObjectAck(ack)) => {
+                log::trace!("Ack received, but not implemented yet.");
+                // todo!();
             },
             (_, _) => unimplemented!(),
         }

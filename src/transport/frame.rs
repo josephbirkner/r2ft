@@ -392,7 +392,7 @@ impl WireFormat for ObjectSkip {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct ObjectAck {
-    acknowledged_object_chunks: Vec<(ObjectId, ChunkId)>,
+    pub acknowledged_object_chunks: Vec<(ObjectId, ChunkId)>,
 }
 
 impl WireFormat for ObjectAck {
