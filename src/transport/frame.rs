@@ -277,7 +277,7 @@ impl WireFormat for ObjectHeader {
 /////////////////////////////////
 // ObjectField
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct ObjectFieldDescription {
     pub field_type: ObjectFieldType,
     pub length: ChunkId, // in nr. of chunks

@@ -67,22 +67,7 @@ impl Connection {
         }
 
         let session = self.session.take().expect("We just checked it is here.");
-        let (chunk, n_tlvs) = self.send_jobs[i].send_next(&session);
-
-        // build ObjectChunk message
-        let mut msg: MessageFrame = MessageFrame::default();
-        msg.sid = session.sessionid;
-        msg.version = PROTOCOL_VERSION;
-        msg.tlvs = Vec::new();
-        let oc: ObjectChunk = ObjectChunk {
-            object_id: self.send_jobs[i].object_id(),
-            chunk_id: self.send_jobs[i].next_chunk,
-            more_chunks: self.send_jobs[i].has_next(),
-            ack_required: self.send_jobs[i].ack_required(),
-            num_enclosed_msgs: n_tlvs,
-            data: chunk,
-        };
-        msg.tlvs.push(Tlv::ObjectChunk(oc));
+        let msg = self.send_jobs[i].send_next(&session);
 
         // serialize and send frame
         let mut cursor = Cursor::new(Vec::new());
@@ -222,8 +207,8 @@ impl Connection {
     }
 }
 
-pub struct EstablishedState {
-    sessionid: SessionId,
+pub(super) struct EstablishedState {
+    pub(super) sessionid: SessionId,
 }
 
 impl EstablishedState {

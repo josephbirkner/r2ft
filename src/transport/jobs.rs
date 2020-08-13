@@ -1,5 +1,6 @@
 use crate::transport::frame::*;
 use crate::transport::connection::*;
+use crate::transport::common;
 
 //////////////////////////
 // Object metatype
@@ -64,17 +65,64 @@ impl ObjectSendJob {
         false
     }
 
+    fn count_chunks(&self) -> ChunkId {
+        let n_chunks: ChunkId = self.object_in_transfer.fields.iter().map(|field| field.length).sum();
+        return n_chunks;
+    }
+
     /// wether self has a chunk after next_chunk
     pub(super) fn has_next(&self) -> bool {
-        let n_chunks: ChunkId = self.object_in_transfer.fields.iter().map(|field| field.length).sum();
+        let n_chunks: ChunkId = self.count_chunks();
         let last_chunk = n_chunks - 1;
         return self.next_chunk < last_chunk;
     }
 
-    /// advances the state for having sent the returned chunk
-    pub(super) fn send_next(&mut self, mut conn: &EstablishedState) -> (Vec<u8>, u8) {
+    fn send_o_header(&mut self, mut session: &EstablishedState) -> MessageFrame {
+        // build ObjectChunk message
+        let mut msg: MessageFrame = MessageFrame::default();
+        msg.sid = session.sessionid;
+        msg.version = common::PROTOCOL_VERSION;
+        msg.tlvs = Vec::new();
+        let oh: ObjectHeader = ObjectHeader {
+            object_id: self.object_id(),
+            num_chunks: self.count_chunks(),
+            ack_req: self.ack_required(),
+            object_type: self.object_type(),
+            fields: self.object_in_transfer.fields.clone(),
+        };
+        msg.tlvs.push(Tlv::ObjectHeader(oh));
+
+        return msg;
+    }
+
+    fn send_o_chunk(&mut self, mut session: &EstablishedState) -> MessageFrame {
         let (chunk, n_tlvs) = (self.get_chunk_callback)(self.next_chunk);
-        return (chunk, n_tlvs);
+
+        // build ObjectChunk message
+        let mut msg: MessageFrame = MessageFrame::default();
+        msg.sid = session.sessionid;
+        msg.version = common::PROTOCOL_VERSION;
+        msg.tlvs = Vec::new();
+        let oc: ObjectChunk = ObjectChunk {
+            object_id: self.object_id(),
+            chunk_id: self.next_chunk,
+            more_chunks: self.has_next(),
+            ack_required: self.ack_required(),
+            num_enclosed_msgs: n_tlvs,
+            data: chunk,
+        };
+        msg.tlvs.push(Tlv::ObjectChunk(oc));
+
+        return msg;
+    }
+
+    /// advances the state for having sent the returned chunk
+    pub(super) fn send_next(&mut self, session: &EstablishedState) -> MessageFrame {
+        if self.next_chunk == -1 {
+            return self.send_o_header(session);
+        } else {
+            return self.send_o_chunk(session);
+        }
     }
 }
 
