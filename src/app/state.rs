@@ -34,6 +34,7 @@ pub struct FileRecvState {
     pub size: u64,
     pub device: Option<fs::File>,
     pub missing_chunks: HashSet<ChunkId>,
+    pub num_chunks: u64,
     pub recv_until: ChunkId,
 }
 
@@ -76,11 +77,11 @@ impl FileRecvState {
                         }
                     };
                     log::info!(" Got a file size: {}", self.size);
-                    let num_chunks = (self.size + DEFAULT_CHUNK_SIZE - 1) / DEFAULT_CHUNK_SIZE;
-                    for i in 0..num_chunks {
+                    self.num_chunks = (self.size + DEFAULT_CHUNK_SIZE - 1) / DEFAULT_CHUNK_SIZE;
+                    for i in 0..self.num_chunks {
                         self.missing_chunks.insert(i as ChunkId);
                     }
-                    log::info!("  Expecting {} chunks.", self.missing_chunks.len());
+                    log::info!("  Expecting {} chunks.", self.num_chunks);
                     match &mut self.device {
                         Some(file) => file.set_len(self.size).expect("Set length failed."),
                         _ => {}
@@ -119,7 +120,7 @@ impl FileRecvState {
             return;
         }
         self.missing_chunks.remove(&chunk_id);
-        log::info!(" Writing chunk {} to {}.", chunk_id, self.name);
+        log::info!(" Writing chunk {}/{} to {}.", chunk_id, self.num_chunks, self.name);
         match &mut self.device {
             Some(file) => {
                 if file
@@ -161,6 +162,7 @@ impl ObjectRecvState {
                 device: None,
                 missing_chunks: HashSet::new(),
                 recv_until: -1,
+                num_chunks: 0,
             }),
             _ => ObjectRecvState::Empty,
         }

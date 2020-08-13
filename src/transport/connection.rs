@@ -2,9 +2,11 @@ use super::frame::*;
 use crate::common::{Cursor, ReadResult, WireFormat};
 use crate::transport::common::*;
 use crate::transport::jobs::*;
+use std::ops::FnMut;
 use log;
 use rand::{thread_rng, Rng};
 use std::net::{SocketAddr, UdpSocket};
+use std::ops::DerefMut;
 
 //////////////////////////
 // Connection
@@ -53,7 +55,6 @@ impl Connection {
         for i in 0..self.send_jobs.len() {
             self.send_once(i);
         }
-
         self.receive_once();
     }
 
@@ -104,7 +105,7 @@ impl Connection {
             let mut cursor = Cursor::new(buf[0..n_bytes].to_vec());
             match message_frame.read(&mut cursor) {
                 ReadResult::Err(x) => {
-                    log::error!("Error: {}", &x.to_string());
+                    log::error!("MessageFrame read error: {}", &x.to_string());
                     return;
                 }
                 _ => {}
@@ -122,33 +123,48 @@ impl Connection {
 
         // check protocol version
         if message_frame.version != PROTOCOL_VERSION {
-            unimplemented!("Protocol doesnt match.");
+            unimplemented!("Protocol version doesn't match.");
         }
 
-        // get first tlv
         if message_frame.tlvs.len() <= 0 {
             log::warn!("Received MessageFrame without tlvs.");
             return;
         }
-        let tlv: Tlv = message_frame.tlvs.remove(0);
 
-        // check if handshake is done
+        for tlv in &message_frame.tlvs {
+            self.accept_tlv(&message_frame, tlv);
+        }
+    }
+
+    fn accept_tlv(&mut self, frame: &MessageFrame, tlv: &Tlv)
+    {
         match (&self.peer_info, tlv) {
             // we are waiting for peer info
             (None, Tlv::HostInformation(hi)) => {
                 // save peer info and complete handshake
-                self.peer_info = Some(hi);
+                self.peer_info = Some(hi.clone());
                 if self.is_server {
                     self.send_handshake();
                 } else {
-                    self.session = Some(EstablishedState::be_gentle(message_frame.sid));
+                    self.session = Some(EstablishedState::be_gentle(frame.sid));
                 }
+                // if is_server: we have received and send HostInfos.
+                // if !is_server: we have sent and received HostInfos.
+                // => this is an ordinary, established connection now.
+                // Therefore we may unwrap:
+                //let peer_info: HostInformation = self.peer_info.unwrap();
+                //let session: EstablishedState = self.session.unwrap();
+                log::info!(
+                    "Session (id: {}) established.",
+                    self.session.as_ref().unwrap().sessionid
+                );
             }
             (None, _) => {
                 log::debug!("This is not the HostInformation tlv we are waiting for. It must be the first TLV in a message.");
                 return;
             }
             (_, Tlv::ObjectHeader(oh)) => {
+                todo!("Match peer info to correct connection.");
                 self.recv_jobs.push(ObjectReceiveJob {
                     chunk_received_callback: Box::new(|_, _, _| {}),
                     object: Object {
@@ -160,20 +176,22 @@ impl Connection {
                     abort: false,
                 });
             }
-            (_, Tlv::ObjectChunk(oh)) => unimplemented!(),
+            (_, Tlv::ObjectChunk(oc)) => {
+                todo!("Match peer info to correct connection.");
+                match self.recv_jobs.iter_mut().find(|job|{
+                    job.object.object_id == oc.object_id
+                }) {
+                    Some(recv_job) => {
+                        let fun = &recv_job.chunk_received_callback;
+                        fun(oc.data.clone(), oc.chunk_id, oc.num_enclosed_msgs);
+                    },
+                    None =>
+                        log::warn!("Received chunk for object {} with no active receive job.",
+                            oc.object_id)
+                };
+            },
             (_, _) => unimplemented!(),
         }
-        // if is_server: we have received and send HostInfos.
-        // if !is_server: we have sent and received HostInfos.
-        // => this is an ordinary, established connection now.
-        // Therefore we may unwrap:
-        //let peer_info: HostInformation = self.peer_info.unwrap();
-        //let session: EstablishedState = self.session.unwrap();
-
-        log::info!(
-            "Session (id: {}) established.",
-            self.session.as_ref().unwrap().sessionid
-        );
     }
 
     /// must be called before anything is sent.
