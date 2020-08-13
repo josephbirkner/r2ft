@@ -66,9 +66,9 @@ pub fn run(opt: Options, listen_addr: Ipv4Addr) -> std::result::Result<(), ()> {
                     None => break,
                 }
             }
-        }
 
-        thread::sleep(time::Duration::from_millis(1));
+            thread::sleep(time::Duration::from_millis(1));
+        }
     }
 
     Ok(())

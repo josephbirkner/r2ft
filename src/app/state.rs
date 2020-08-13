@@ -36,6 +36,7 @@ pub struct FileRecvState {
     pub missing_chunks: HashSet<ChunkId>,
     pub num_chunks: u64,
     pub recv_until: ChunkId,
+    pub header_received: bool
 }
 
 impl FileRecvState {
@@ -90,6 +91,8 @@ impl FileRecvState {
                 _ => {}
             }
         }
+        log::info!(" Header received.");
+        self.header_received = true;
     }
 
     pub fn notify_content(
@@ -120,7 +123,7 @@ impl FileRecvState {
             return;
         }
         self.missing_chunks.remove(&chunk_id);
-        log::info!(" Writing chunk {}/{} to {}.", chunk_id, self.num_chunks, self.name);
+        log::info!(" Writing chunk {}/{} to {}.", chunk_id+1, self.num_chunks, self.name);
         match &mut self.device {
             Some(file) => {
                 if file
@@ -141,7 +144,7 @@ impl FileRecvState {
     }
 
     pub fn done(&self) -> bool {
-        self.missing_chunks.is_empty()
+        self.header_received && self.missing_chunks.is_empty()
     }
 }
 
@@ -157,12 +160,13 @@ impl ObjectRecvState {
     fn new(obj_type: ObjectType) -> Self {
         match FromPrimitive::from_u8(obj_type) {
             Some(AppObjectType::FileResponse) => ObjectRecvState::File(FileRecvState {
-                name: String::from("unknown"),
+                name: String::from(""),
                 size: 0,
                 device: None,
                 missing_chunks: HashSet::new(),
                 recv_until: -1,
                 num_chunks: 0,
+                header_received: false
             }),
             _ => ObjectRecvState::Empty,
         }
@@ -233,6 +237,7 @@ impl StateMachine {
 
     pub fn push_file_request_job(&mut self, files: Vec<String>) -> ObjectSendJob {
         let files_len = files.len();
+        self.expected_files = files.clone();
         ObjectSendJob::new(
             Object {
                 object_type: AppObjectType::FileRequest.to_u8().unwrap(),
@@ -362,13 +367,13 @@ impl StateMachine {
                     }),
                     _ => AppTlv::FileContent(FileContent {
                         content: {
+                            let content_chunk_idx = chunk_id - 1; // 1 metadata chunk
                             log::info!(
                                 " Sending chunk {}/{} for {}",
-                                chunk_id + 1,
+                                content_chunk_idx + 1,
                                 send_state.num_content_chunks,
                                 send_state.path
                             );
-                            let content_chunk_idx = chunk_id - 1; // 1 metadata chunk
                             let mut result = Vec::new();
                             let start_pos = content_chunk_idx * DEFAULT_CHUNK_SIZE as i64;
                             if send_state
@@ -441,7 +446,7 @@ impl StateMachine {
         let state_machine_ref = Rc::clone(state_machine);
         recv_job.chunk_received_callback =
             Box::new(move |data: Vec<u8>, chunk_id: ChunkId, num_tlv: u8| {
-                let state_machine = state_machine_ref.borrow_mut();
+                let mut state_machine = state_machine_ref.borrow_mut();
                 let mut cursor = Cursor::new(data);
                 log::info!(
                     "Received chunk #{} for object #{}, {} tlvs.",
@@ -460,6 +465,8 @@ impl StateMachine {
                         }
                     };
                     let obj_state = state_machine.recv_state.get(&object_info).unwrap();
+                    let mut finished = false;
+                    let mut new_file_send_jobs = vec![];
                     match (&tlv, obj_state.borrow_mut().deref_mut()) {
                         (AppTlv::FileMetadata(metadata_tlv), ObjectRecvState::File(f)) => {
                             f.notify_metadata(metadata_tlv);
@@ -472,21 +479,23 @@ impl StateMachine {
                                 " Received server error (code {})",
                                 err_tlv.error_code.to_u8().unwrap()
                             );
-                            state_machine_ref.borrow_mut().finished();
+                            finished = true;
                         }
                         (AppTlv::FileRequest(request_tlv), ObjectRecvState::Empty) => {
-                            for file in &request_tlv.file_paths {
-                                state_machine_ref
-                                    .borrow_mut()
-                                    .push_file_send_job(file.clone());
-                            }
+                            new_file_send_jobs = request_tlv.file_paths.clone();
                         }
                         _ => {
                             log::error!(" Encountered unexpected TLV type.");
-                            state_machine_ref.borrow_mut().finished();
+                            finished = true;
                         }
                     }
                     tlv_idx += 1;
+                    if finished {
+                        state_machine.finished();
+                    }
+                    for file in &new_file_send_jobs {
+                        state_machine.push_file_send_job(file.clone());
+                    }
                 }
             });
     }

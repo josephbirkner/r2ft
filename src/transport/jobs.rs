@@ -117,12 +117,13 @@ impl ObjectSendJob {
     }
 
     /// advances the state for having sent the returned chunk
-    pub(super) fn send_next(&mut self, session: &EstablishedState) -> MessageFrame {
+    pub(super) fn send_next(&mut self, session: &EstablishedState) -> Option<MessageFrame> {
         if self.next_chunk == -1 {
-            return self.send_o_header(session);
-        } else {
-            return self.send_o_chunk(session);
+            return Some(self.send_o_header(session));
+        } else if self.next_chunk < self.count_chunks() {
+            return Some(self.send_o_chunk(session));
         }
+        None
     }
 }
 

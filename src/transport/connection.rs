@@ -66,18 +66,18 @@ impl Connection {
             return;
         }
 
-        let session = self.session.take().expect("We just checked it is here.");
+        let session = self.session.as_ref().unwrap();
         let msg = self.send_jobs[i].send_next(&session);
 
         // serialize and send frame
-        let mut cursor = Cursor::new(Vec::new());
-        msg.write(&mut cursor);
-        let buf = cursor.into_inner();
-        let n_sent = self.socket.send(&buf).unwrap();
-        assert_eq!(n_sent, buf.len());
-
-        self.send_jobs[i].next_chunk += 1;
-        self.session = Some(session);
+        if let Some(msg) = &msg {
+            let mut cursor = Cursor::new(Vec::new());
+            msg.write(&mut cursor);
+            let buf = cursor.into_inner();
+            let n_sent = self.socket.send(&buf).unwrap();
+            assert_eq!(n_sent, buf.len());
+            self.send_jobs[i].next_chunk += 1;
+        }
     }
 
     /// receive the next packet
