@@ -159,6 +159,7 @@ impl Connection {
                         transmission_finished_callback: Box::new(|| {}),
                     },
                     abort: false,
+                    ack_req: if oh.ack_req { -1 } else { -2 },
                 });
             }
             (_, Tlv::ObjectChunk(oc)) => {
@@ -167,6 +168,7 @@ impl Connection {
                     job.object.object_id == oc.object_id
                 }) {
                     Some(recv_job) => {
+                        if oc.ack_required { recv_job.ack_req = oc.chunk_id }
                         let fun = &mut recv_job.chunk_received_callback;
                         fun(oc.data.clone(), oc.chunk_id, oc.num_enclosed_msgs);
                     },
@@ -174,6 +176,21 @@ impl Connection {
                         log::warn!("Received chunk for object {} with no active receive job.",
                             oc.object_id)
                 };
+            },
+            (_, Tlv::ObjectAckRequest(ar)) => {
+                // for every ackreq ...
+                for (objectid, chunkid) in &ar.req_ack_object_chunks {
+                    // ... find the job for the object ...
+                    match self.recv_jobs.iter_mut().find(|job|{
+                        job.object.object_id == *objectid
+                    }) {
+                        Some(recv_job) => {
+                            // ... and set the req ack
+                            recv_job.ack_req = *chunkid;
+                        },
+                        None => log::warn!("Received AckReq for unknown Object.")
+                    }
+                }
             },
             (_, _) => unimplemented!(),
         }

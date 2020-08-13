@@ -517,7 +517,7 @@ impl WireFormat for ErrorMessage {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct ObjectAckRequest {
-    req_ack_object_chunks: Vec<(ObjectId, ChunkId)>,
+    pub req_ack_object_chunks: Vec<(ObjectId, ChunkId)>,
 }
 
 impl WireFormat for ObjectAckRequest {

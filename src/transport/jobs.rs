@@ -141,4 +141,6 @@ pub struct ObjectReceiveJob {
     pub object: Object,
     /// Abort receiving by setting this flag to true.
     pub abort: bool,
+    /// -2, if no Ack required, else chunkid [-1,infty] which was requested to be acked.
+    pub ack_req: ChunkId,
 }
