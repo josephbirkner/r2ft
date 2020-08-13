@@ -20,6 +20,8 @@ The additional option `-u` can be used by the server to specify an address that 
 `$ cargo run -- -h` / `$rft -h`
 
 #### Output
+
+```
 rft 0.1.0
 Peter Okelmann <okelmann@in.tum.de>
 Joseph Birkner <joseph.birkner@tum.de>
@@ -51,7 +53,7 @@ OPTIONS:
 ARGS:
     <host>       the host to send to or request from (hostname or IPv4 address)
     <file>...    the name of the file(s) to fetch
-
+```
 
 ### Run client for file retrieval:
 `$ cargo run -- [OPTIONS] <host> <file>...`/ `$ rft [OPTIONS] <host> <file>...`
