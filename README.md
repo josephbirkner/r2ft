@@ -3,15 +3,18 @@
 RFT by Group 1
 
 ## Build
-
 You need the rust toolchain (i.e. using [rustup.rs](https://rustup.rs)).
 
-```
-cargo build
-```
-To build the docs: `cargo docs`
+We used cargo as our package manager.
+You can
+-  build the docs via `cargo docs`
+-  run the tests via `cargo test`
+-  compile the package via `cargo build`
 
 ## Usage
+You can either use the binary produced by e.g. `cargo build --release` (to be found in targe/release/) or `cargo run` to run our code.
+Use the environment variable `RUST_LOG` to get shown logging output.
+
 The command line application uses the command line options specified by the lecture slides.
 The additional option `-l <list>` conflicts with `<file>...` and can be used to run a client for file list retrieval for the given directory instead of a client for regular file retrieval.
 The additional option `-u` can be used by the server to specify an address that should be used for listening. 
@@ -59,13 +62,13 @@ ARGS:
 `$ cargo run -- [OPTIONS] <host> <file>...`/ `$ rft [OPTIONS] <host> <file>...`
 
 #### Example
-`$ cargo run -- 127.0.0.1:42424 file1`
+`$ RUST_LOG=trace cargo run -- 127.0.0.1:42424 file1`
 
 ### Run server:
 `$ cargo run -- [OPTIONS] -s`/ `$ rft [OPTIONS] -s`
 
 #### Example
-`$ cargo run -- -s -t 42424 -u 127.0.0.1`
+`$ RUST_LOG=trace cargo run -- -s -t 42424 -u 127.0.0.1`
 
 ### Run client for file list retrieval:
 `$ cargo run -- [OPTIONS] <host> -l <list>`/ `$ rft [OPTIONS] <host> -l <list>`
