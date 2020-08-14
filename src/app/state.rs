@@ -20,7 +20,7 @@ const DEFAULT_CHUNK_SIZE: u64 = 512;
 
 //////////////////////////////
 // FileSendState
-
+// Holds state while sending a file via a file response
 pub struct FileSendState {
     pub device: fs::File,
     pub num_content_chunks: u64,
@@ -29,7 +29,7 @@ pub struct FileSendState {
 
 //////////////////////////////
 // FileRecvState
-
+// Holds state while receiving a file via a file response
 pub struct FileRecvState {
     pub name: String,
     pub size: u64,
@@ -42,6 +42,7 @@ pub struct FileRecvState {
 }
 
 impl FileRecvState {
+    /// Adds a metadata to the state of this file
     pub fn notify_metadata(&mut self, metadata: &FileMetadata) -> Result<(),()> {
         for entry in &metadata.metadata_entries {
             match entry.code {
@@ -111,12 +112,14 @@ impl FileRecvState {
         Ok(())
     }
 
+    /// Adds the given chunk of file content data the state of this file 
     pub fn notify_content(
         &mut self,
         content: &FileContent,
         mut chunk_id: ChunkId,
         fields: &HashMap<ObjectFieldType, ChunkId>,
     ) -> Result<(),()> {
+        // Check if file can be written
         if self.device.is_none() {
             log::warn!("Ignoring chunk received before file was initialised.");
             return Err(());
@@ -125,6 +128,8 @@ impl FileRecvState {
             log::warn!("Ignoring unexpected chunk, I am done or I haven't started.");
             return Err(());
         }
+
+        /// Get absolute position of this chunk in file
         let num_metadata_chunks =
             match fields.get(&AppObjectFieldType::FileResponseMetadata.to_u8().unwrap()) {
                 Some(val) => *val,
@@ -134,11 +139,15 @@ impl FileRecvState {
                 }
             };
         chunk_id -= num_metadata_chunks;
+
+        // Remove chunk from missing chunks
         if !self.missing_chunks.contains(&chunk_id) {
             log::warn!("Ignoring unexpected chunk with ID {}", chunk_id);
             return Err(());
         }
         self.missing_chunks.remove(&chunk_id);
+
+        // Write chunk to file
         log::info!(" Writing chunk {}/{} to {}.", chunk_id+1, self.num_chunks, self.name);
         match &mut self.device {
             Some(file) => {
@@ -152,7 +161,8 @@ impl FileRecvState {
                     return Err(());
                 }
 
-                if chunk_id as u64+1 == self.num_chunks {
+                // check the sha3 hash if all chunks were received
+                if chunk_id as u64+1 == self.num_chunks { // self.done()
 
                     let mut buffer = Vec::new();
                     // Must reopen file because it was closed by last 
@@ -196,7 +206,7 @@ impl FileRecvState {
 
 //////////////////////////////
 // ObjectRecvState
-
+// Can hold different types of state
 pub enum ObjectRecvState {
     File(FileRecvState),
     Empty,
@@ -222,15 +232,16 @@ impl ObjectRecvState {
 
 //////////////////////////////
 // StateMachine
-
+// Holds the state of a client or server.
 pub struct StateMachine {
     state: State,
     next_object_id: ObjectId,
     expected_files: Vec<String>,
     recv_state: HashMap<(ObjectType, ObjectId), RefCell<ObjectRecvState>>,
-    send_job_outbox: Vec<ObjectSendJob>,
+    send_job_outbox: Vec<ObjectSendJob>, // will be pushed to the corresponding conection in the server/ client run methods
 }
 
+/// Startup/ Connected state should be considered the same. It just matters if it is finished or not. 
 #[derive(PartialEq, Eq)]
 pub enum State {
     Startup,
@@ -282,10 +293,14 @@ impl StateMachine {
         num_received_files == self.expected_files.len()
     }
 
+    /// Creates and returns a ObjectSendJob corresponding to the file request for the given files
+    /// The ObjectSendJob is an abstraction that represent a file request object to be sent by the transport layer
+    /// ObjectSendJop has callback to get arbitrary tlvs Chunks for the object and information to produce object header
     pub fn push_file_request_job(&mut self, files: Vec<String>) -> ObjectSendJob {
         let files_len = files.len();
         self.expected_files = files.clone();
         ObjectSendJob::new(
+            // Define properties of the object to be sent (here is is a FileRequestObject with a single TLV, thus only one field with length 1)
             Object {
                 object_type: AppObjectType::FileRequest.to_u8().unwrap(),
                 object_id: self.get_next_object_id(),
@@ -297,6 +312,7 @@ impl StateMachine {
                     log::info!("Transmitted request for {} files.", files_len);
                 }),
             },
+            // Callback to get the tlv chunks (here it is assumed that one tlv is sufficient, thus no further checks on chunk_id)
             Box::new(move |chunk_id: ChunkId| {
                 let result = FileRequest {
                     file_paths: files.clone(),
@@ -308,6 +324,9 @@ impl StateMachine {
         )
     }
 
+    /// Creates a ObjectSendJob corresponding to the file response for the given file, that will be put this state machine's outbox
+    /// The ObjectSendJob is an abstraction that represent a file response object to be sent by the transport layer
+    /// The ObjectSendJob has callback to get arbitrary tlvs Chunks for the object and information to produce object header
     pub fn push_file_send_job(&mut self, file_path: String) {
         let file = match fs::File::open(file_path.clone()) {
             Ok(file_obj) => file_obj,
@@ -337,6 +356,7 @@ impl StateMachine {
             path: file_path.clone(),
         };
         let new_send_job = ObjectSendJob::new(
+            // Define properties of the object to be sent (here is is a FileResponse object with on field of type metadata with a single chunk and one Field of type FileContent with a variable number of chunks)
             Object {
                 object_type: AppObjectType::FileResponse.to_u8().unwrap(),
                 object_id: self.get_next_object_id(),
@@ -357,9 +377,11 @@ impl StateMachine {
                     })
                 },
             },
+            // Callback to get the chunk with the given id (here it is assumed that one tlv is sufficient, thus no further checks on chunk_id)
             Box::new(move |chunk_id: ChunkId| {
                 let path = Path::new(&send_state.path);
                 let tlv_to_send = match chunk_id {
+                    // Chunk 0 is Metadata tlv with multiple entries
                     0 => AppTlv::FileMetadata(FileMetadata {
                         metadata_entries: vec![
                             MetadataEntry {
@@ -418,6 +440,7 @@ impl StateMachine {
                             },
                         ],
                     }),
+                    // All other chunks are FileContent TLVs that have to be read from the file
                     _ => AppTlv::FileContent(FileContent {
                         content: {
                             let content_chunk_idx = chunk_id - 1; // 1 metadata chunk
@@ -451,13 +474,17 @@ impl StateMachine {
                 (cursor.into_inner(), 1)
             }),
         );
+        // Adds jobs to the out box (from where they will finally be put to the transport layer (connection))
         self.send_job_outbox.push(new_send_job);
     }
 
+    /// Creates a ObjectSendJob for the given application error, that will be put this state machine's outbox
+    /// The ObjectSendJob is an abstraction that represent a error report object to be sent by the transport layer
+    /// The ObjectSendJob has a callback to get arbitrary tlvs Chunks for the object and information to produce object header
     pub fn push_error_send_job(&mut self, app_err: ApplicationError) {
         // The given application error will be sent via a single TLV (thus will not work for large payloads)
-        // extending to large lists of file paths probably won't make much sense.
         let new_send_job = ObjectSendJob::new(
+            // Define properties of the object to be sent (has one field with a single junk)
             Object {
                 object_type: AppObjectType::ErrorReport.to_u8().unwrap(),
                 object_id: self.get_next_object_id(),
@@ -469,6 +496,7 @@ impl StateMachine {
                     log::info!("Error fully transmitted.");
                 }),
             },
+            // Callback to get the chunk with the given id (there is only a single Chunk)
             Box::new(move |chunk_id: ChunkId| {
                 let mut cursor = Cursor::new(Vec::new());
                 app_err.write(&mut cursor);
@@ -483,10 +511,15 @@ impl StateMachine {
             .contains_key(&(recv_job.object.object_type, recv_job.object.object_id))
     }
 
+    /// Adds a callback to the recv_job that abstracts the receiving of object chunks
+    /// Adds recv_state to given state_machine
+    /// ((Server + Client) Application layer logic for recceveing requests/ responses implemented here!)
     pub fn push_recv_job(
         state_machine: &Rc<RefCell<StateMachine>>,
         recv_job: &mut ObjectReceiveJob,
     ) {
+        //////////////////
+        // Adds a new object state to it hash map
         let object_info = (recv_job.object.object_type, recv_job.object.object_id);
         let mut field_length = HashMap::new();
         for field in &recv_job.object.fields {
@@ -498,6 +531,10 @@ impl StateMachine {
         );
 
         let state_machine_ref = Rc::clone(state_machine);
+        ////////////////
+        // Adds callback to the receive job
+        // Callback to be called on received chunks / tlvs
+        // Combined application layer logic for receiving objects
         recv_job.chunk_received_callback =
             Box::new(move |data: Vec<u8>, chunk_id: ChunkId, num_tlv: u8| {
                 let mut state_machine = state_machine_ref.borrow_mut();
