@@ -2,6 +2,8 @@
 
 RFT by Group 1
 
+You can find the slides from our final presentation and specification doucuments in the spec directory.
+
 ## Build
 You need the rust toolchain (i.e. using [rustup.rs](https://rustup.rs)).
 
