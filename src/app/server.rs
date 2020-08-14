@@ -28,8 +28,7 @@ pub fn run(opt: Options, listen_addr: Ipv4Addr) -> std::result::Result<(), ()> {
 
     //////////////////////////////
     // State changes may be triggered by received messages
-    while !state_machine.borrow().is_finished()
-    {
+    while !state_machine.borrow().is_finished() {
         thread::sleep(time::Duration::from_millis(1));
 
         ///////////////////////////////////

@@ -8,13 +8,13 @@ use num::{FromPrimitive, ToPrimitive};
 use sha3::{Digest, Sha3_512};
 use std::cell::RefCell;
 use std::cmp::min;
+use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::rc::Rc;
-use std::cmp::PartialEq;
 
 const DEFAULT_CHUNK_SIZE: u64 = 512;
 
@@ -38,12 +38,12 @@ pub struct FileRecvState {
     pub missing_chunks: HashSet<ChunkId>,
     pub num_chunks: u64,
     pub recv_until: ChunkId,
-    pub header_received: bool
+    pub header_received: bool,
 }
 
 impl FileRecvState {
     /// Adds a metadata to the state of this file
-    pub fn notify_metadata(&mut self, metadata: &FileMetadata) -> Result<(),()> {
+    pub fn notify_metadata(&mut self, metadata: &FileMetadata) -> Result<(), ()> {
         for entry in &metadata.metadata_entries {
             match entry.code {
                 MetadataEntryType::FileName => {
@@ -112,13 +112,13 @@ impl FileRecvState {
         Ok(())
     }
 
-    /// Adds the given chunk of file content data the state of this file 
+    /// Adds the given chunk of file content data the state of this file
     pub fn notify_content(
         &mut self,
         content: &FileContent,
         mut chunk_id: ChunkId,
         fields: &HashMap<ObjectFieldType, ChunkId>,
-    ) -> Result<(),()> {
+    ) -> Result<(), ()> {
         // Check if file can be written
         if self.device.is_none() {
             log::warn!("Ignoring chunk received before file was initialised.");
@@ -148,7 +148,12 @@ impl FileRecvState {
         self.missing_chunks.remove(&chunk_id);
 
         // Write chunk to file
-        log::info!(" Writing chunk {}/{} to {}.", chunk_id+1, self.num_chunks, self.name);
+        log::info!(
+            " Writing chunk {}/{} to {}.",
+            chunk_id + 1,
+            self.num_chunks,
+            self.name
+        );
         match &mut self.device {
             Some(file) => {
                 if file
@@ -162,10 +167,11 @@ impl FileRecvState {
                 }
 
                 // check the sha3 hash if all chunks were received
-                if chunk_id as u64+1 == self.num_chunks { // self.done()
+                if chunk_id as u64 + 1 == self.num_chunks {
+                    // self.done()
 
                     let mut buffer = Vec::new();
-                    // Must reopen file because it was closed by last 
+                    // Must reopen file because it was closed by last
                     match fs::File::open(&self.name).unwrap().read_to_end(&mut buffer) {
                         Err(e) => {
                             error!("Could not produce hash for file.");
@@ -223,7 +229,7 @@ impl ObjectRecvState {
                 missing_chunks: HashSet::new(),
                 recv_until: -1,
                 num_chunks: 0,
-                header_received: false
+                header_received: false,
             }),
             _ => ObjectRecvState::Empty,
         }
@@ -241,7 +247,7 @@ pub struct StateMachine {
     send_job_outbox: Vec<ObjectSendJob>, // will be pushed to the corresponding conection in the server/ client run methods
 }
 
-/// Startup/ Connected state should be considered the same. It just matters if it is finished or not. 
+/// Startup/ Connected state should be considered the same. It just matters if it is finished or not.
 #[derive(PartialEq, Eq)]
 pub enum State {
     Startup,

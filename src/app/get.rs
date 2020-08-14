@@ -53,12 +53,11 @@ pub fn get(opt: Options, socket_addr: SocketAddr, files: Vec<&str>) -> std::resu
     //////////////////////////////
     // Wait until reception is done.
     // State of statemachine is used since it may also be changed via callbacks
-    while !state_machine.borrow().is_finished()
-    {
+    while !state_machine.borrow().is_finished() {
         connection.receive_and_send();
 
         ///////////////////////////////////
-        // Register new receive jobs from connection to state 
+        // Register new receive jobs from connection to state
         for recv_job in &mut connection.recv_jobs {
             if !state_machine.borrow().has_recv_job(recv_job) {
                 StateMachine::push_recv_job(&state_machine, recv_job);

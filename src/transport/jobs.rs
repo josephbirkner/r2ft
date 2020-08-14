@@ -1,6 +1,6 @@
-use crate::transport::frame::*;
-use crate::transport::connection::*;
 use crate::transport::common;
+use crate::transport::connection::*;
+use crate::transport::frame::*;
 
 //////////////////////////
 // Object metatype
@@ -66,7 +66,12 @@ impl ObjectSendJob {
     }
 
     fn count_chunks(&self) -> ChunkId {
-        let n_chunks: ChunkId = self.object_in_transfer.fields.iter().map(|field| field.length).sum();
+        let n_chunks: ChunkId = self
+            .object_in_transfer
+            .fields
+            .iter()
+            .map(|field| field.length)
+            .sum();
         return n_chunks;
     }
 

@@ -2,11 +2,11 @@ use super::frame::*;
 use crate::common::{Cursor, ReadResult, WireFormat};
 use crate::transport::common::*;
 use crate::transport::jobs::*;
-use std::ops::FnMut;
 use log;
 use rand::{thread_rng, Rng};
 use std::net::{SocketAddr, UdpSocket};
 use std::ops::DerefMut;
+use std::ops::FnMut;
 
 //////////////////////////
 // Connection
@@ -61,7 +61,7 @@ impl Connection {
 
     /// send acks for all receiving objects, if required
     fn send_acks(&mut self) {
-        if self.session.is_none() { 
+        if self.session.is_none() {
             log::warn!("Refusing to Ack on a Connection which is not fully established.");
             return;
         }
@@ -76,7 +76,9 @@ impl Connection {
             }
         }
 
-        if acks.is_empty() { return; } // no acks to send
+        if acks.is_empty() {
+            return;
+        } // no acks to send
 
         // build ObjectChunk message
         let mut msg: MessageFrame = MessageFrame::default();
@@ -84,7 +86,7 @@ impl Connection {
         msg.version = PROTOCOL_VERSION;
         msg.tlvs = Vec::new();
         let ack: ObjectAck = ObjectAck {
-            acknowledged_object_chunks: acks
+            acknowledged_object_chunks: acks,
         };
         msg.tlvs.push(Tlv::ObjectAck(ack));
     }
@@ -152,8 +154,7 @@ impl Connection {
         }
     }
 
-    fn accept_tlv(&mut self, frame: &MessageFrame, tlv: &Tlv)
-    {
+    fn accept_tlv(&mut self, frame: &MessageFrame, tlv: &Tlv) {
         match (&self.peer_info, tlv) {
             // we are waiting for peer info
             (None, Tlv::HostInformation(hi)) => {
@@ -195,38 +196,45 @@ impl Connection {
             }
             (_, Tlv::ObjectChunk(oc)) => {
                 // todo!("Match peer info to correct connection.");
-                match self.recv_jobs.iter_mut().find(|job|{
-                    job.object.object_id == oc.object_id
-                }) {
+                match self
+                    .recv_jobs
+                    .iter_mut()
+                    .find(|job| job.object.object_id == oc.object_id)
+                {
                     Some(recv_job) => {
-                        if oc.ack_required { recv_job.ack_req = oc.chunk_id }
+                        if oc.ack_required {
+                            recv_job.ack_req = oc.chunk_id
+                        }
                         let fun = &mut recv_job.chunk_received_callback;
                         fun(oc.data.clone(), oc.chunk_id, oc.num_enclosed_msgs);
-                    },
-                    None =>
-                        log::warn!("Received chunk for object {} with no active receive job.",
-                            oc.object_id)
+                    }
+                    None => log::warn!(
+                        "Received chunk for object {} with no active receive job.",
+                        oc.object_id
+                    ),
                 };
-            },
+            }
             (_, Tlv::ObjectAckRequest(ar)) => {
                 // for every ackreq ...
                 for (objectid, chunkid) in &ar.req_ack_object_chunks {
                     // ... find the job for the object ...
-                    match self.recv_jobs.iter_mut().find(|job|{
-                        job.object.object_id == *objectid
-                    }) {
+                    match self
+                        .recv_jobs
+                        .iter_mut()
+                        .find(|job| job.object.object_id == *objectid)
+                    {
                         Some(recv_job) => {
                             // ... and set the req ack
                             recv_job.ack_req = *chunkid;
-                        },
-                        None => log::warn!("Received AckReq for unknown Object.")
+                        }
+                        None => log::warn!("Received AckReq for unknown Object."),
                     }
                 }
-            },
+            }
             (_, Tlv::ObjectAck(ack)) => {
                 log::trace!("Ack received, but not implemented yet.");
                 // todo!();
-            },
+            }
             (_, _) => unimplemented!(),
         }
     }

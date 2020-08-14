@@ -5,8 +5,7 @@ use std::fs::File;
 use std::io::{Seek, SeekFrom};
 
 #[test]
-fn test_serialize_message_frame()
-{
+fn test_serialize_message_frame() {
     // Structure to serialize
     let message_frame = MessageFrame {
         version: 1,
